@@ -1,13 +1,13 @@
 use crate::AppState;
 use crate::models::{
-    CreateRequest, CreateResponse, FetchRequest, FetchResponse, Location, PostRequest, Session,
+    CreateRequest, CreateResponse, FetchRequest, FetchResponse, Location, PostRequest,
+    PostResponse, Session,
 };
 use actix_web::{HttpResponse, Responder, get, post, web};
 use chrono::{Duration, Utc};
 use hex;
-use rand::distributions::Alphanumeric;
-use rand::{Rng, thread_rng};
-use serde_json::json;
+use log::info;
+use rand::{Rng, distributions::Alphanumeric, thread_rng};
 use sha2::{Digest, Sha256};
 
 /// Placeholder authentication function.
@@ -29,15 +29,23 @@ pub fn check_authentication(
     true
 }
 
+pub fn generate_id() -> String {
+    rand::thread_rng()
+        .sample_iter(&Alphanumeric)
+        .take(16)
+        .map(char::from)
+        .collect()
+}
+
 /// Handler for the `/api/create` endpoint.
 ///
 /// This function creates a new tracking session and returns a share link.
-#[post("/api/create")]
+#[post("/api/create.php")]
 pub async fn create_session(
     data: web::Form<CreateRequest>,
     state: web::Data<AppState>,
 ) -> impl Responder {
-    let session_id = data.session_id.clone();
+    let session_id = generate_id();
 
     // Check if a session with this ID already exists.
     if state.contains_key(&session_id) {
@@ -57,11 +65,7 @@ pub async fn create_session(
     let password_hash = hex::encode(hasher.finalize());
 
     // Generate a unique share link token.
-    let share_link_token: String = thread_rng()
-        .sample_iter(&Alphanumeric)
-        .take(16)
-        .map(char::from)
-        .collect();
+    let share_link_token: String = generate_id();
 
     // Calculate the expiration time.
     let expires_at = Utc::now() + Duration::seconds(data.duration as i64);
@@ -78,18 +82,23 @@ pub async fn create_session(
 
     // Construct the response.
     let response = CreateResponse {
-        status: "ok".to_string(),
+        status: "OK".to_string(),
         session_id: session_id.clone(),
         share_link: share_link_token,
+        share_id: data.share_id.clone().unwrap_or(generate_id()),
     };
 
-    HttpResponse::Ok().json(response)
+    // Create an HTTP response with a Content-Type of "text/plain".
+    // This tells the client how to interpret the response body.
+    HttpResponse::Ok()
+        .content_type("text/plain")
+        .body(response.to_client())
 }
 
 /// Handler for the `/api/post` endpoint.
 ///
 /// This function updates the location data for an existing session.
-#[post("/api/post")]
+#[post("/api/post.php")]
 pub async fn post_location(
     data: web::Form<PostRequest>,
     state: web::Data<AppState>,
@@ -100,9 +109,12 @@ pub async fn post_location(
         None => return HttpResponse::NotFound().body("Session not found."),
     };
 
-    // Use the new authentication logic.
-    if !check_authentication(&data.user, &data.password, &session) {
-        return HttpResponse::Unauthorized().body("Invalid password.");
+    let now = Utc::now();
+    if session.expires_at < now {
+        info!("wot");
+        drop(session);
+        state.remove(&data.session_id);
+        return HttpResponse::Gone().body("Session has expired.");
     }
 
     // Create a new Location struct with the provided data.
@@ -112,19 +124,25 @@ pub async fn post_location(
         acc: data.accuracy,
         alt: data.altitude,
         spd: data.speed,
-        brg: data.bearing,
     };
 
     // Update the last_location field of the session.
     session.last_location = Some(new_location);
 
-    HttpResponse::Ok().json(json!({"status": "ok"}))
+    let response = PostResponse {
+        public_url: "http://localhost".to_string(), // TODO
+        target_ids: Vec::new(),
+    };
+
+    HttpResponse::Ok()
+        .content_type("text/plain")
+        .body(response.to_client())
 }
 
 /// Handler for the `/api/fetch` endpoint.
 ///
 /// This function retrieves the latest location data for a session.
-#[get("/api/fetch")]
+#[get("/api/fetch.php")]
 pub async fn fetch_location(
     data: web::Query<FetchRequest>,
     state: web::Data<AppState>,
@@ -160,7 +178,6 @@ pub async fn fetch_location(
             acc: loc.acc,
             alt: loc.alt,
             spd: loc.spd,
-            brg: loc.brg,
             expires_in: time_remaining,
         },
         None => FetchResponse {
@@ -170,7 +187,6 @@ pub async fn fetch_location(
             acc: None,
             alt: None,
             spd: None,
-            brg: None,
             expires_in: time_remaining,
         },
     };
