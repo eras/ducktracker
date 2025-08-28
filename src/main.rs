@@ -37,7 +37,7 @@ async fn main() -> std::io::Result<()> {
         App::new()
             .wrap(Logger::default())
             .wrap(cors)
-            .app_data(web::Data::from(app_state.clone()))
+            .app_data(web::Data::new(app_state.clone()))
             .service(handlers::create_session)
             .service(handlers::post_location)
             .service(handlers::fetch_location)
