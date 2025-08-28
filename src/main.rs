@@ -1,7 +1,9 @@
 use actix_cors::Cors;
-use actix_web::{App, HttpServer, web};
+use actix_web::{App, HttpServer, middleware::Logger, web};
 use dashmap::DashMap;
+use log::info;
 use std::sync::Arc;
+use tracing_subscriber::{EnvFilter, FmtSubscriber};
 
 mod handlers;
 mod models;
@@ -14,10 +16,18 @@ pub type AppState = Arc<DashMap<String, models::Session>>;
 /// Main function to set up and run the `actix-web` server.
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
+    // Set up a subscriber to log messages to the console, forcing them to be unbuffered.
+    // This explicitly writes to stdout and should resolve the issue.
+    FmtSubscriber::builder()
+        .with_env_filter(EnvFilter::from_default_env())
+        .with_line_number(true)
+        .with_target(true)
+        .init();
+
     // Create the shared application state.
     let app_state: AppState = Arc::new(DashMap::new());
 
-    println!("Starting server at http://127.0.0.1:8080");
+    info!("Starting server at http://127.0.0.1:8080");
 
     // Start the HTTP server.
     HttpServer::new(move || {
@@ -25,6 +35,7 @@ async fn main() -> std::io::Result<()> {
         let cors = Cors::permissive();
 
         App::new()
+            .wrap(Logger::default())
             .wrap(cors)
             .app_data(web::Data::from(app_state.clone()))
             .service(handlers::create_session)
