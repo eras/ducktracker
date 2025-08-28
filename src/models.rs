@@ -33,6 +33,7 @@ pub struct Session {
 /// Request body for the /api/create endpoint.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CreateRequest {
+    #[serde(rename = "session_id")]
     pub session_id: String,
     pub password: Option<String>,
     pub duration: u64, // In seconds
@@ -49,7 +50,11 @@ pub struct CreateResponse {
 /// Request body for the /api/post endpoint.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct PostRequest {
+    #[serde(rename = "session")]
     pub session_id: String,
+    #[serde(rename = "usr")]
+    pub user: Option<String>,
+    #[serde(rename = "pwd")]
     pub password: Option<String>,
     #[serde(rename = "lat")]
     pub latitude: f64,

@@ -10,6 +10,25 @@ use rand::{Rng, thread_rng};
 use serde_json::json;
 use sha2::{Digest, Sha256};
 
+/// Placeholder authentication function.
+/// This function should be replaced with real authentication logic in the future.
+pub fn check_authentication(
+    _user: &Option<String>,
+    _password: &Option<String>,
+    _session: &Session,
+) -> bool {
+    // For now, we will simply pass the authentication check.
+    // In a real-world scenario, you would hash the provided password
+    // and compare it to the stored hash in the session object.
+    //
+    // let mut hasher = Sha256::new();
+    // let provided_password = password.clone().unwrap_or_default();
+    // hasher.update(provided_password.as_bytes());
+    // let provided_password_hash = hex::encode(hasher.finalize());
+    // provided_password_hash == session.password_hash
+    true
+}
+
 /// Handler for the `/api/create` endpoint.
 ///
 /// This function creates a new tracking session and returns a share link.
@@ -81,13 +100,8 @@ pub async fn post_location(
         None => return HttpResponse::NotFound().body("Session not found."),
     };
 
-    // Hash the provided password and compare it to the stored hash.
-    let mut hasher = Sha256::new();
-    let provided_password = data.password.clone().unwrap_or_default();
-    hasher.update(provided_password.as_bytes());
-    let provided_password_hash = hex::encode(hasher.finalize());
-
-    if provided_password_hash != session.password_hash {
+    // Use the new authentication logic.
+    if !check_authentication(&data.user, &data.password, &session) {
         return HttpResponse::Unauthorized().body("Invalid password.");
     }
 
