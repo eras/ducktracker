@@ -15,7 +15,7 @@ use sha2::{Digest, Sha256};
 /// This function creates a new tracking session and returns a share link.
 #[post("/api/create")]
 pub async fn create_session(
-    data: web::Json<CreateRequest>,
+    data: web::Form<CreateRequest>,
     state: web::Data<AppState>,
 ) -> impl Responder {
     let session_id = data.session_id.clone();
@@ -72,7 +72,7 @@ pub async fn create_session(
 /// This function updates the location data for an existing session.
 #[post("/api/post")]
 pub async fn post_location(
-    data: web::Json<PostRequest>,
+    data: web::Form<PostRequest>,
     state: web::Data<AppState>,
 ) -> impl Responder {
     // Find and get a mutable reference to the session from the DashMap.
