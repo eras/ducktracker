@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::AppState;
 use crate::models::{
     CreateRequest, CreateResponse, FetchRequest, FetchResponse, Location, Point, PostRequest,
@@ -174,14 +176,15 @@ pub async fn fetch_location(
         Some(location) => [Point::from_location(&location)].to_vec(),
     };
 
+    let mut all_points = HashMap::new();
+    all_points.insert("hello".into(), points);
+
     let response = FetchResponse {
-        type_: ShareType::Alone,
+        type_: ShareType::Group,
         expire: 0.0f64,
         server_time: 0.0f64,
         interval: 0u64,
-        points: points,
-        encrypted: false,
-        salt: "".to_string(),
+        points: all_points,
     };
 
     HttpResponse::Ok().json(response)

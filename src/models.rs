@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
@@ -168,16 +170,16 @@ impl Serialize for ShareType {
 }
 
 pub type TimeUsec = f64;
+pub type Nick = String;
 
 /// Response body for the /api/fetch endpoint.
 #[derive(Debug, Serialize)]
 pub struct FetchResponse {
     #[serde(rename = "type")]
-    pub type_: ShareType,
+    pub type_: ShareType, // Must be Group
     pub expire: f64,
+    #[serde(rename = "serverTime")]
     pub server_time: TimeUsec,
     pub interval: u64,
-    pub points: Vec<Point>,
-    pub encrypted: bool,
-    pub salt: String,
+    pub points: HashMap<Nick, Vec<Point>>,
 }

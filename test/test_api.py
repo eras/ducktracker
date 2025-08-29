@@ -50,8 +50,8 @@ class HaukApiTest(unittest.TestCase):
 
             # Fetch still returns JSON for data retrieval
             data = response.json()
-            self.assertIsInstance(data["points"], list)
-            self.assertEqual(len(data["points"]), 0)  # No locations posted yet
+            nick = list(data["points"].keys())[0]
+            self.assertEqual(len(data["points"][nick]), 0)  # No locations posted yet
             print(f"\nSuccessfully created and fetched an empty session: {session_id}")
 
         except requests.exceptions.RequestException as e:
@@ -111,12 +111,12 @@ class HaukApiTest(unittest.TestCase):
             )
             self.assertEqual(response.status_code, 200)
             data = response.json()
-            self.assertIsInstance(data["points"], list)
+            nick = list(data["points"].keys())[0]
             self.assertGreater(
-                len(data["points"]), 0, "Expected any data to present, none found"
+                len(data["points"][nick]), 0, "Expected any data to present, none found"
             )
 
-            first_location = data["points"][0]
+            first_location = data["points"][nick][0]
             self.assertAlmostEqual(first_location[0], location_data["lat"])
             self.assertAlmostEqual(first_location[1], location_data["lon"])
 
