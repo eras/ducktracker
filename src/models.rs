@@ -19,7 +19,7 @@ pub struct Location {
 pub struct Session {
     pub session_id: String,
     pub password_hash: String,
-    pub share_link_token: String,
+    pub share_id: String,
     pub last_location: Option<Location>,
     pub expires_at: DateTime<Utc>,
 }
@@ -100,23 +100,84 @@ impl PostResponse {
 /// Request body for the /api/fetch endpoint.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct FetchRequest {
-    #[serde(rename = "sharelink")]
-    pub share_link_token: String,
+    #[serde(rename = "id")]
+    pub share_id: String,
 }
 
-/// Response body for the /api/fetch endpoint.
-#[derive(Debug, Serialize, Deserialize)]
-pub struct FetchResponse {
-    pub status: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub lat: Option<f64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub lon: Option<f64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+#[derive(Debug, Clone)]
+pub struct Point {
+    pub lat: f64,
+    pub lon: f64,
+    pub time: f64,
     pub acc: Option<f64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub alt: Option<f64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub spd: Option<f64>,
-    pub expires_in: i64, // Seconds remaining until expiration
+    pub prv: Option<bool>,
+}
+
+impl Point {
+    pub fn from_location(loc: &Location) -> Point {
+        Point {
+            lat: loc.lat,
+            lon: loc.lon,
+            time: 0.0f64,
+            acc: loc.acc,
+            spd: loc.spd,
+            prv: Some(false),
+        }
+    }
+}
+
+impl Serialize for Point {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        // NOTE to update the number of elements, if the structure would ever change
+        let mut state = serializer.serialize_seq(Some(8))?;
+        use serde::ser::SerializeSeq;
+        state.serialize_element(&self.lat)?;
+        state.serialize_element(&self.lon)?;
+        state.serialize_element(&self.time)?;
+        state.serialize_element(&self.spd)?;
+        state.serialize_element(&self.acc)?;
+        match self.prv {
+            None => state.serialize_element::<Option<i64>>(&None)?,
+            Some(false) => state.serialize_element(&0)?,
+            Some(true) => state.serialize_element(&1)?,
+        }
+        state.end()
+    }
+}
+
+#[derive(Debug)]
+pub enum ShareType {
+    Alone,
+    Group,
+}
+
+impl Serialize for ShareType {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            ShareType::Alone => serializer.serialize_i64(0),
+            ShareType::Group => serializer.serialize_i64(1),
+        }
+    }
+}
+
+pub type TimeUsec = f64;
+
+/// Response body for the /api/fetch endpoint.
+#[derive(Debug, Serialize)]
+pub struct FetchResponse {
+    #[serde(rename = "type")]
+    pub type_: ShareType,
+    pub expire: f64,
+    pub server_time: TimeUsec,
+    pub interval: u64,
+    pub points: Vec<Point>,
+    pub encrypted: bool,
+    pub salt: String,
 }

@@ -1,7 +1,7 @@
 use crate::AppState;
 use crate::models::{
-    CreateRequest, CreateResponse, FetchRequest, FetchResponse, Location, PostRequest,
-    PostResponse, Session,
+    CreateRequest, CreateResponse, FetchRequest, FetchResponse, Location, Point, PostRequest,
+    PostResponse, Session, ShareType,
 };
 use actix_web::{HttpResponse, Responder, get, post, web};
 use chrono::{Duration, Utc};
@@ -65,7 +65,8 @@ pub async fn create_session(
     let password_hash = hex::encode(hasher.finalize());
 
     // Generate a unique share link token.
-    let share_link_token: String = generate_id();
+    let share_id: String = data.share_id.clone().unwrap_or_else(|| generate_id());
+    let share_link = format!("http://127.0.0.1/{share_id}");
 
     // Calculate the expiration time.
     let expires_at = Utc::now() + Duration::seconds(data.duration as i64);
@@ -74,7 +75,7 @@ pub async fn create_session(
     let new_session = Session {
         session_id: session_id.clone(),
         password_hash,
-        share_link_token: share_link_token.clone(),
+        share_id: share_id.clone(),
         last_location: None, // No location data initially
         expires_at,
     };
@@ -84,8 +85,8 @@ pub async fn create_session(
     let response = CreateResponse {
         status: "OK".to_string(),
         session_id: session_id.clone(),
-        share_link: share_link_token,
-        share_id: data.share_id.clone().unwrap_or(generate_id()),
+        share_link: share_link,
+        share_id: share_id.clone(),
     };
 
     // Create an HTTP response with a Content-Type of "text/plain".
@@ -148,9 +149,7 @@ pub async fn fetch_location(
     state: web::Data<AppState>,
 ) -> impl Responder {
     // Look up the session in the DashMap using the share link token.
-    let session = state
-        .iter()
-        .find(|entry| entry.share_link_token == data.share_link_token);
+    let session = state.iter().find(|entry| entry.share_id == data.share_id);
 
     let session = match session {
         Some(s) => s,
@@ -170,25 +169,19 @@ pub async fn fetch_location(
     let time_remaining = session.expires_at.signed_duration_since(now).num_seconds();
 
     // Construct the response.
-    let response = match last_location {
-        Some(loc) => FetchResponse {
-            status: "ok".to_string(),
-            lat: Some(loc.lat),
-            lon: Some(loc.lon),
-            acc: loc.acc,
-            alt: loc.alt,
-            spd: loc.spd,
-            expires_in: time_remaining,
-        },
-        None => FetchResponse {
-            status: "ok".to_string(),
-            lat: None,
-            lon: None,
-            acc: None,
-            alt: None,
-            spd: None,
-            expires_in: time_remaining,
-        },
+    let points = match last_location {
+        None => [].to_vec(),
+        Some(location) => [Point::from_location(&location)].to_vec(),
+    };
+
+    let response = FetchResponse {
+        type_: ShareType::Alone,
+        expire: 0.0f64,
+        server_time: 0.0f64,
+        interval: 0u64,
+        points: points,
+        encrypted: false,
+        salt: "".to_string(),
     };
 
     HttpResponse::Ok().json(response)
