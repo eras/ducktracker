@@ -31,7 +31,7 @@ pub struct Session {
 // ========================
 
 /// Request body for the /api/create endpoint.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Deserialize)]
 pub struct CreateRequest {
     #[serde(rename = "usr")]
     pub user: Option<String>,
@@ -66,7 +66,7 @@ impl CreateResponse {
 }
 
 /// Request body for the /api/post endpoint.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Deserialize)]
 pub struct PostRequest {
     #[serde(rename = "sid")]
     pub session_id: String,
@@ -100,7 +100,7 @@ impl PostResponse {
 }
 
 /// Request body for the /api/fetch endpoint.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Deserialize)]
 pub struct FetchRequest {
     #[serde(rename = "id")]
     pub share_id: String,
