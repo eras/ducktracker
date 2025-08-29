@@ -81,11 +81,12 @@ class HaukApiTest(unittest.TestCase):
             lines = response.text.strip().split("\n")
             self.assertEqual(lines[0], "OK")
             session_id = lines[1]
+            share_id = lines[3]
 
             # Define the location data to post
             # The data is now sent as form-urlencoded, not JSON.
             location_data = {
-                "session": session_id,
+                "sid": session_id,
                 "lat": 34.0522,
                 "lon": -118.2437,
                 "acc": 10.5,
@@ -93,6 +94,7 @@ class HaukApiTest(unittest.TestCase):
                 "speed": 60,
                 "dir": 90,
                 "batt": 75,
+                "prv": 0,
                 "time": int(time.time()),
             }
 
@@ -101,20 +103,22 @@ class HaukApiTest(unittest.TestCase):
             self.assertEqual(response.status_code, 200)
 
             # Check for the simple "OK" response.
-            self.assertEqual(response.text.strip(), "OK")
+            self.assertEqual(self.parse_response(response.text)[0], "OK")
 
             # 2. Test fetch_location to retrieve the posted data
             response = requests.get(
-                f"{self.BASE_URL}fetch.php", params={"session": session_id}
+                f"{self.BASE_URL}fetch.php", params={"id": share_id}
             )
             self.assertEqual(response.status_code, 200)
             data = response.json()
-            self.assertIsInstance(data, list)
-            self.assertGreater(len(data), 0)
+            self.assertIsInstance(data["points"], list)
+            self.assertGreater(
+                len(data["points"]), 0, "Expected any data to present, none found"
+            )
 
-            first_location = data[0]
-            self.assertAlmostEqual(first_location["lat"], location_data["lat"])
-            self.assertAlmostEqual(first_location["lon"], location_data["lon"])
+            first_location = data["points"][0]
+            self.assertAlmostEqual(first_location[0], location_data["lat"])
+            self.assertAlmostEqual(first_location[1], location_data["lon"])
 
             print(
                 f"\nSuccessfully posted and fetched location for session: {session_id}"
