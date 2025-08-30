@@ -70,8 +70,15 @@ const MapComponent: React.FC = () => {
         // Render markers
         trace.p.forEach((point) => {
           // Use [lon, lat] order as requested
-          const marker = L.marker([point[0], point[1]]);
-          marker.bindTooltip(`Tags: ${trace.t.join(", ")}`);
+          const marker = L.circleMarker([point[0], point[1]], {
+            radius: 6,
+            fillColor: "#0078A8",
+            color: "#fff",
+            weight: 1,
+            opacity: 1,
+            fillOpacity: 0.8,
+          });
+          marker.bindTooltip(`${trace.t.join(", ")}`);
           markersRef.current?.addLayer(marker);
         });
       }
