@@ -9,6 +9,7 @@ const MapComponent: React.FC = () => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const markersRef = useRef<L.LayerGroup | null>(null);
+  const polylinesRef = useRef<L.LayerGroup | null>(null); // Reference for the trace lines
   const isFirstUpdateRef = useRef(true);
   const { locations, selectedTags } = useAppStore();
 
@@ -30,8 +31,10 @@ const MapComponent: React.FC = () => {
     }).addTo(map);
 
     const markers = L.layerGroup().addTo(map);
+    const polylines = L.layerGroup().addTo(map); // Add a layer for polylines
     mapRef.current = map;
     markersRef.current = markers;
+    polylinesRef.current = polylines;
 
     return () => {
       if (mapRef.current) {
@@ -41,19 +44,30 @@ const MapComponent: React.FC = () => {
     };
   }, []);
 
-  // Update markers based on data and filters
+  // Update markers and polylines based on data and filters
   useEffect(() => {
-    if (!markersRef.current) return;
+    if (!markersRef.current || !polylinesRef.current) return;
 
-    // Clear existing markers
+    // Clear existing markers and polylines
     markersRef.current.clearLayers();
+    polylinesRef.current.clearLayers();
 
-    // Add new markers based on filtered data
+    // Add new markers and polylines based on filtered data
     Object.values(locations).forEach((trace) => {
       const hasSelectedTag = trace.t.some((tag) => selectedTags.has(tag));
       const isFiltered = selectedTags.size > 0 && !hasSelectedTag;
 
       if (!isFiltered) {
+        // Use [lon, lat] order as requested
+        const points = trace.p.map(
+          (point) => [point[0], point[1]] as L.LatLngTuple,
+        );
+
+        // Render polyline
+        const polyline = L.polyline(points, { color: "blue", weight: 3 });
+        polylinesRef.current?.addLayer(polyline);
+
+        // Render markers
         trace.p.forEach((point) => {
           // Use [lon, lat] order as requested
           const marker = L.marker([point[0], point[1]]);
