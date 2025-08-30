@@ -1,7 +1,7 @@
-import { create } from 'zustand';
-import { LocationData, ServerMessage } from './types';
+import { create } from "zustand";
+import { LocationData, ServerMessage } from "./types";
 
-interface ProtocolState {
+export interface ProtocolState {
   locations: LocationData;
   tags: string[];
   fetchData: () => void;
@@ -20,17 +20,17 @@ export const useProtocolStore = create<ProtocolState>((set) => ({
   fetchData: () => {
     // Initial data load simulation
     const initialData: ServerMessage = {
-      tags: ['food', 'home', 'work'],
+      tags: ["food", "home", "work"],
       locations: {
-        '1': {
-          t: ['food', 'alone'],
+        "1": {
+          t: ["food", "alone"],
           p: [
             [-74.006, 40.7128],
             [-74.0061, 40.7129],
           ],
         },
-        '42': {
-          t: ['work', 'group'],
+        "42": {
+          t: ["work", "group"],
           p: [
             [-74.005, 40.713],
             [-74.0051, 40.7131],
@@ -44,16 +44,16 @@ export const useProtocolStore = create<ProtocolState>((set) => ({
     // Simulate a partial update over SSE after a delay
     setTimeout(() => {
       const partialUpdate: LocationData = {
-        '1': {
-          t: ['food', 'alone'],
+        "1": {
+          t: ["food", "alone"],
           p: [
-            ...initialData.locations['1'].p,
+            ...initialData.locations["1"].p,
             [-74.0062, 40.7132],
             [-74.0063, 40.7133],
           ],
         },
-        '99': {
-          t: ['home'],
+        "99": {
+          t: ["home"],
           p: [
             [-74.004, 40.711],
             [-74.0041, 40.7111],

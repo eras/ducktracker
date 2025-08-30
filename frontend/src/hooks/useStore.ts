@@ -1,6 +1,6 @@
-import { create } from 'zustand';
-import { useProtocolStore } from '../lib/protocol';
-import { LocationData } from '../lib/types';
+import { create } from "zustand";
+import { useProtocolStore } from "../lib/protocol";
+import { LocationData } from "../lib/types";
 
 interface AppState {
   selectedTags: Set<string>;
@@ -31,13 +31,12 @@ export const useAppStore = create<AppState>((set) => ({
     }),
 }));
 
-// Subscribe to the protocol store to keep the app state in sync
-useProtocolStore.subscribe(
-  (protocolState) => {
-    useAppStore.setState({
-      locations: protocolState.locations,
-      tags: protocolState.tags,
-    });
-  },
-  (state) => state
-);
+// Subscribe to the protocol store to keep the app state in sync.
+// This approach correctly uses the subscribe method with a single listener
+// function, resolving the TypeScript errors.
+useProtocolStore.subscribe((protocolState) => {
+  useAppStore.setState({
+    locations: protocolState.locations,
+    tags: protocolState.tags,
+  });
+});
