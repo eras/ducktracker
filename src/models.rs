@@ -169,8 +169,25 @@ impl Serialize for ShareType {
     }
 }
 
-pub type TimeUsec = f64;
+#[derive(Debug)]
+pub struct TimeUsec(pub std::time::SystemTime);
+
 pub type Nick = String;
+
+impl Serialize for TimeUsec {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let epoch = self
+            .0
+            .duration_since(std::time::SystemTime::UNIX_EPOCH)
+            .expect("Expected unix time to be available")
+            .as_secs_f64();
+
+        serializer.serialize_u64((epoch * 1000000.0) as u64)
+    }
+}
 
 /// Response body for the /api/fetch endpoint.
 #[derive(Debug, Serialize)]

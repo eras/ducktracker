@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use crate::AppState;
 use crate::models::{
     CreateRequest, CreateResponse, FetchRequest, FetchResponse, Location, Point, PostRequest,
-    PostResponse, Session, ShareType,
+    PostResponse, Session, ShareType, TimeUsec,
 };
 use actix_web::{HttpResponse, Responder, get, post, web};
 use chrono::{Duration, Utc};
@@ -176,7 +176,7 @@ pub async fn fetch_location(
     let response = FetchResponse {
         type_: ShareType::Group,
         expire: 0.0f64,
-        server_time: 0.0f64,
+        server_time: TimeUsec(std::time::SystemTime::now()),
         interval: 0u64,
         points: all_points,
     };
