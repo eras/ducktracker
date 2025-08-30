@@ -22,7 +22,7 @@ pub struct Session {
     pub session_id: String,
     pub password_hash: String,
     pub share_id: String,
-    pub last_location: Option<Location>,
+    pub locations: Vec<Location>,
     pub expires_at: DateTime<Utc>,
 }
 

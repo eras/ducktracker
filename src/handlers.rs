@@ -78,7 +78,7 @@ pub async fn create_session(
         session_id: session_id.clone(),
         password_hash,
         share_id: share_id.clone(),
-        last_location: None, // No location data initially
+        locations: Vec::new(),
         expires_at,
     };
     state.insert(session_id.clone(), new_session);
@@ -130,7 +130,7 @@ pub async fn post_location(
     };
 
     // Update the last_location field of the session.
-    session.last_location = Some(new_location);
+    session.locations.push(new_location);
 
     let response = PostResponse {
         public_url: "http://localhost".to_string(), // TODO
@@ -164,17 +164,11 @@ pub async fn fetch_location(
         return HttpResponse::Gone().body("Session has expired.");
     }
 
-    // Get the location data from the session.
-    let last_location = session.last_location.clone();
-
     // Calculate time remaining until expiration.
     let time_remaining = session.expires_at.signed_duration_since(now).num_seconds();
 
     // Construct the response.
-    let points = match last_location {
-        None => [].to_vec(),
-        Some(location) => [Point::from_location(&location)].to_vec(),
-    };
+    let points: Vec<Point> = session.locations.iter().map(Point::from_location).collect();
 
     let mut all_points = HashMap::new();
     all_points.insert("hello".into(), points);
