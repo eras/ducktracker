@@ -13,7 +13,7 @@ pub struct Location {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub spd: Option<f64>,
     #[serde(rename = "prv")]
-    pub provider: u64, // 0 or 1
+    pub provider: u64, // location provider, seems to be 0 or 1, probably coarse vs fine
     pub time: f64,
 }
 
