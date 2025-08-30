@@ -107,29 +107,23 @@ pub struct FetchRequest {
 }
 
 #[derive(Debug, Clone)]
-pub struct Point {
-    pub lat: f64,
-    pub lon: f64,
+pub struct Point<'a> {
+    pub location: &'a Location,
     pub time: f64,
-    pub acc: Option<f64>,
-    pub spd: Option<f64>,
     pub prv: Option<bool>,
 }
 
-impl Point {
+impl Point<'_> {
     pub fn from_location(loc: &Location) -> Point {
         Point {
-            lat: loc.lat,
-            lon: loc.lon,
+            location: loc,
             time: 0.0f64,
-            acc: loc.acc,
-            spd: loc.spd,
             prv: Some(false),
         }
     }
 }
 
-impl Serialize for Point {
+impl Serialize for Point<'_> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
@@ -137,11 +131,11 @@ impl Serialize for Point {
         // NOTE to update the number of elements, if the structure would ever change
         let mut state = serializer.serialize_seq(Some(8))?;
         use serde::ser::SerializeSeq;
-        state.serialize_element(&self.lat)?;
-        state.serialize_element(&self.lon)?;
+        state.serialize_element(&self.location.lat)?;
+        state.serialize_element(&self.location.lon)?;
         state.serialize_element(&self.time)?;
-        state.serialize_element(&self.spd)?;
-        state.serialize_element(&self.acc)?;
+        state.serialize_element(&self.location.spd)?;
+        state.serialize_element(&self.location.acc)?;
         match self.prv {
             None => state.serialize_element::<Option<i64>>(&None)?,
             Some(false) => state.serialize_element(&0)?,
@@ -191,12 +185,12 @@ impl Serialize for TimeUsec {
 
 /// Response body for the /api/fetch endpoint.
 #[derive(Debug, Serialize)]
-pub struct FetchResponse {
+pub struct FetchResponse<'a> {
     #[serde(rename = "type")]
     pub type_: ShareType, // Must be Group
     pub expire: f64,
     #[serde(rename = "serverTime")]
     pub server_time: TimeUsec,
     pub interval: u64,
-    pub points: HashMap<Nick, Vec<Point>>,
+    pub points: HashMap<Nick, Vec<Point<'a>>>,
 }
