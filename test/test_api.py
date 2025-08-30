@@ -52,7 +52,6 @@ class HaukApiTest(unittest.TestCase):
             data = response.json()
             nick = list(data["points"].keys())[0]
             self.assertEqual(len(data["points"][nick]), 0)  # No locations posted yet
-            print(f"\nSuccessfully created and fetched an empty session: {session_id}")
 
         except requests.exceptions.RequestException as e:
             self.fail(f"HTTP request failed: {e}")
@@ -119,10 +118,6 @@ class HaukApiTest(unittest.TestCase):
             first_location = data["points"][nick][0]
             self.assertAlmostEqual(first_location[0], location_data["lat"])
             self.assertAlmostEqual(first_location[1], location_data["lon"])
-
-            print(
-                f"\nSuccessfully posted and fetched location for session: {session_id}"
-            )
 
         except requests.exceptions.RequestException as e:
             self.fail(f"HTTP request failed: {e}")
