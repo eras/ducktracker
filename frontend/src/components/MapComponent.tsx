@@ -9,6 +9,7 @@ const MapComponent: React.FC = () => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const markersRef = useRef<L.LayerGroup | null>(null);
+  const isFirstUpdateRef = useRef(true);
   const { locations, selectedTags } = useAppStore();
 
   // Initialize the map (runs only once)
@@ -60,8 +61,11 @@ const MapComponent: React.FC = () => {
     // Optionally fit the map bounds to the markers
     const allPoints = Object.values(locations).flatMap((trace) => trace.p);
     if (allPoints.length > 0 && mapRef.current) {
-      const bounds = L.latLngBounds(allPoints.map((p) => [p[1], p[0]]));
-      mapRef.current.fitBounds(bounds, { padding: [50, 50] });
+      if (isFirstUpdateRef.current) {
+        const bounds = L.latLngBounds(allPoints.map((p) => [p[1], p[0]]));
+        mapRef.current.fitBounds(bounds, { padding: [50, 50], animate: false });
+        isFirstUpdateRef.current = false;
+      }
     }
   }, [locations, selectedTags]);
 
