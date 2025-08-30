@@ -72,7 +72,7 @@ pub struct PostRequest {
     #[serde(rename = "sid")]
     pub session_id: String,
     #[serde(rename = "prv")]
-    pub provider: u64, // what is this?
+    pub provider: Option<u64>,
     pub time: f64,
     #[serde(rename = "lat")]
     pub latitude: f64,

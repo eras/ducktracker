@@ -126,7 +126,7 @@ pub async fn post_location(
         lon: data.longitude,
         acc: data.accuracy,
         spd: data.speed,
-        provider: data.provider,
+        provider: data.provider.unwrap_or(0),
         time: data.time,
     };
 
