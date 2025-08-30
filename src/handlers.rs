@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::AppState;
 use crate::models::{
-    CreateRequest, CreateResponse, FetchRequest, FetchResponse, Location, Point, PostRequest,
+    CreateRequest, CreateResponse, FetchRequest, FetchResponse, Location, PostRequest,
     PostResponse, Session, ShareType, TimeUsec,
 };
 use actix_web::{HttpResponse, Responder, get, post, web};
@@ -125,8 +125,9 @@ pub async fn post_location(
         lat: data.latitude,
         lon: data.longitude,
         acc: data.accuracy,
-        alt: data.altitude,
         spd: data.speed,
+        provider: data.provider,
+        time: data.time,
     };
 
     // Update the last_location field of the session.
@@ -168,7 +169,7 @@ pub async fn fetch_location(
     let time_remaining = session.expires_at.signed_duration_since(now).num_seconds();
 
     // Construct the response.
-    let points: Vec<Point> = session.locations.iter().map(Point::from_location).collect();
+    let points: Vec<Location> = session.locations.clone();
 
     let mut all_points = HashMap::new();
     all_points.insert("hello".into(), points);

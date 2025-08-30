@@ -4,16 +4,17 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 /// Represents the current location data for a session.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct Location {
     pub lat: f64,
     pub lon: f64,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub acc: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub alt: Option<f64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub spd: Option<f64>,
+    #[serde(rename = "prv")]
+    pub provider: u64, // 0 or 1
+    pub time: f64,
 }
 
 /// Represents a single tracking session. This data is stored in memory.
@@ -70,7 +71,8 @@ impl CreateResponse {
 pub struct PostRequest {
     #[serde(rename = "sid")]
     pub session_id: String,
-    pub prv: u64, // what is this?
+    #[serde(rename = "prv")]
+    pub provider: u64, // what is this?
     pub time: f64,
     #[serde(rename = "lat")]
     pub latitude: f64,
@@ -79,10 +81,6 @@ pub struct PostRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(rename = "acc")]
     pub accuracy: Option<f64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(rename = "alt")]
-    pub altitude: Option<f64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(rename = "spd")]
     pub speed: Option<f64>,
 }
@@ -106,24 +104,7 @@ pub struct FetchRequest {
     pub share_id: String,
 }
 
-#[derive(Debug, Clone)]
-pub struct Point<'a> {
-    pub location: &'a Location,
-    pub time: f64,
-    pub prv: Option<bool>,
-}
-
-impl Point<'_> {
-    pub fn from_location(loc: &Location) -> Point {
-        Point {
-            location: loc,
-            time: 0.0f64,
-            prv: Some(false),
-        }
-    }
-}
-
-impl Serialize for Point<'_> {
+impl Serialize for Location {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
@@ -131,16 +112,12 @@ impl Serialize for Point<'_> {
         // NOTE to update the number of elements, if the structure would ever change
         let mut state = serializer.serialize_seq(Some(8))?;
         use serde::ser::SerializeSeq;
-        state.serialize_element(&self.location.lat)?;
-        state.serialize_element(&self.location.lon)?;
+        state.serialize_element(&self.lat)?;
+        state.serialize_element(&self.lon)?;
         state.serialize_element(&self.time)?;
-        state.serialize_element(&self.location.spd)?;
-        state.serialize_element(&self.location.acc)?;
-        match self.prv {
-            None => state.serialize_element::<Option<i64>>(&None)?,
-            Some(false) => state.serialize_element(&0)?,
-            Some(true) => state.serialize_element(&1)?,
-        }
+        state.serialize_element(&self.spd)?;
+        state.serialize_element(&self.acc)?;
+        state.serialize_element(&self.provider)?;
         state.end()
     }
 }
@@ -185,12 +162,12 @@ impl Serialize for TimeUsec {
 
 /// Response body for the /api/fetch endpoint.
 #[derive(Debug, Serialize)]
-pub struct FetchResponse<'a> {
+pub struct FetchResponse {
     #[serde(rename = "type")]
     pub type_: ShareType, // Must be Group
     pub expire: f64,
     #[serde(rename = "serverTime")]
     pub server_time: TimeUsec,
     pub interval: u64,
-    pub points: HashMap<Nick, Vec<Point<'a>>>,
+    pub points: HashMap<Nick, Vec<Location>>,
 }
