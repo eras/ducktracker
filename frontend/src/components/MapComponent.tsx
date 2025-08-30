@@ -18,7 +18,7 @@ const MapComponent: React.FC = () => {
       container: mapContainerRef.current,
       style: "https://demotiles.maplibre.org/style.json",
       //style: "https://www.openstreetmap.org/styles/osm-carto/style.json",
-      center: [-74.006, 40.7128],
+      center: [17.65431710431244, 32.954120326746775],
       zoom: 12,
     });
 
