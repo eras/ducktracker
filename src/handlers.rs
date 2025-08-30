@@ -5,12 +5,14 @@ use crate::models::{
     CreateRequest, CreateResponse, FetchRequest, FetchResponse, Location, PostRequest,
     PostResponse, Session, ShareType, TimeUsec,
 };
+use crate::state;
 use actix_web::{HttpResponse, Responder, get, post, web};
 use chrono::{Duration, Utc};
 use hex;
 use log::info;
 use rand::{Rng, distributions::Alphanumeric, thread_rng};
 use sha2::{Digest, Sha256};
+use tokio_stream::StreamExt; // For stream combinators like .next()
 
 /// Placeholder authentication function.
 /// This function should be replaced with real authentication logic in the future.
@@ -50,7 +52,7 @@ pub async fn create_session(
     let session_id = generate_id();
 
     // Check if a session with this ID already exists.
-    if state.contains_key(&session_id) {
+    if state.sessions.contains_key(&session_id) {
         return HttpResponse::BadRequest().body("Session ID already exists.");
     }
 
@@ -81,7 +83,7 @@ pub async fn create_session(
         locations: Vec::new(),
         expires_at,
     };
-    state.insert(session_id.clone(), new_session);
+    state.sessions.insert(session_id.clone(), new_session);
 
     // Construct the response.
     let response = CreateResponse {
@@ -107,7 +109,7 @@ pub async fn post_location(
     state: web::Data<AppState>,
 ) -> impl Responder {
     // Find and get a mutable reference to the session from the DashMap.
-    let mut session = match state.get_mut(&data.session_id) {
+    let mut session = match state.sessions.get_mut(&data.session_id) {
         Some(s) => s,
         None => return HttpResponse::NotFound().body("Session not found."),
     };
@@ -115,7 +117,7 @@ pub async fn post_location(
     let now = Utc::now();
     if session.expires_at < now {
         drop(session);
-        state.remove(&data.session_id);
+        state.sessions.remove(&data.session_id);
         return HttpResponse::Gone().body("Session has expired.");
     }
 
@@ -151,7 +153,10 @@ pub async fn fetch_location(
     state: web::Data<AppState>,
 ) -> impl Responder {
     // Look up the session in the DashMap using the share link token.
-    let session = state.iter().find(|entry| entry.share_id == data.share_id);
+    let session = state
+        .sessions
+        .iter()
+        .find(|entry| entry.share_id == data.share_id);
 
     let session = match session {
         Some(s) => s,
@@ -182,4 +187,32 @@ pub async fn fetch_location(
     };
 
     HttpResponse::Ok().json(response)
+}
+
+#[actix_web::get("/api/stream")]
+async fn stream(state: web::Data<AppState>) -> impl Responder {
+    let updates = state.updates.updates().await;
+
+    let events = futures_util::StreamExt::map(updates, |update| {
+        let update = update.expect("woot, there should have been an update..");
+        let json_data = serde_json::to_string(&update).expect("Failed to encode Update to JSON");
+        Ok::<_, std::convert::Infallible>(actix_web_lab::sse::Event::Data(
+            actix_web_lab::sse::Data::new(json_data),
+        ))
+    });
+
+    actix_web_lab::sse::Sse::from_stream(events).with_keep_alive(std::time::Duration::from_secs(5))
+}
+
+#[actix_web::get("/api/test")]
+async fn test(state: web::Data<AppState>) -> impl Responder {
+    state
+        .updates
+        .updates_tx
+        .send(state::Update {
+            message: "hello".to_string(),
+        })
+        .unwrap();
+
+    HttpResponse::Ok().content_type("text/plain").body("")
 }

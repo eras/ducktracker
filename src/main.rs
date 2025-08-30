@@ -7,11 +7,17 @@ use tracing_subscriber::{EnvFilter, FmtSubscriber};
 
 mod handlers;
 mod models;
+mod state;
 
 // The central, shared application state. We use an Arc to allow multiple
 // worker threads to share the state, and a DashMap for thread-safe
 // concurrent access to the session data.
-pub type AppState = Arc<DashMap<String, models::Session>>;
+pub struct State {
+    sessions: DashMap<String, models::Session>,
+    updates: state::Updates,
+}
+
+pub type AppState = Arc<State>;
 
 /// Main function to set up and run the `actix-web` server.
 #[actix_web::main]
@@ -25,7 +31,12 @@ async fn main() -> std::io::Result<()> {
         .init();
 
     // Create the shared application state.
-    let app_state: AppState = Arc::new(DashMap::new());
+    let (updates_tx, _updates_rx) = tokio::sync::broadcast::channel(10);
+    let updates = state::Updates { updates_tx };
+    let app_state: AppState = Arc::new(State {
+        sessions: DashMap::new(),
+        updates,
+    });
 
     info!("Starting server at http://127.0.0.1:8080");
 
@@ -41,6 +52,8 @@ async fn main() -> std::io::Result<()> {
             .service(handlers::create_session)
             .service(handlers::post_location)
             .service(handlers::fetch_location)
+            .service(handlers::stream)
+            .service(handlers::test)
     })
     .bind(("0.0.0.0", 8080))?
     .run()
