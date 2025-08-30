@@ -72,7 +72,7 @@ const MapComponent: React.FC = () => {
     }
   }, [locations, selectedTags]);
 
-  return <div ref={mapContainerRef} className="w-full h-full z-0 flex-grow" />;
+  return <div ref={mapContainerRef} className="w-full h-full z-0" />;
 };
 
 export default MapComponent;
