@@ -114,7 +114,6 @@ pub async fn post_location(
 
     let now = Utc::now();
     if session.expires_at < now {
-        info!("wot");
         drop(session);
         state.remove(&data.session_id);
         return HttpResponse::Gone().body("Session has expired.");
