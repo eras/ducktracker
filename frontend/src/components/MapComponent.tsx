@@ -1,53 +1,33 @@
-import React, { useEffect, useRef, useState } from "react";
-import maplibregl from "maplibre-gl";
+import React, { useEffect, useRef } from "react";
 import { useAppStore } from "../hooks/useStore";
+import "leaflet";
+
+// Use a global L from the script tag
+declare const L: typeof import("leaflet");
 
 const MapComponent: React.FC = () => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<maplibregl.Map | null>(null);
-  const [isMapLoaded, setIsMapLoaded] = useState(false);
+  const mapRef = useRef<L.Map | null>(null);
+  const markersRef = useRef<L.LayerGroup | null>(null);
   const { locations, selectedTags } = useAppStore();
 
-  // Effect for map initialization (runs only once)
+  // Initialize the map (runs only once)
   useEffect(() => {
-    if (mapRef.current) return;
+    if (mapRef.current || !L) return;
 
     if (!mapContainerRef.current) return;
 
-    const map = new maplibregl.Map({
-      container: mapContainerRef.current,
-      style: "https://demotiles.maplibre.org/style.json",
-      //style: "https://www.openstreetmap.org/styles/osm-carto/style.json",
-      center: [17.65431710431244, 32.954120326746775],
-      zoom: 12,
-    });
+    const map = L.map(mapContainerRef.current).setView([40.7128, -74.006], 12);
 
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution:
+        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    }).addTo(map);
+
+    const markers = L.layerGroup().addTo(map);
     mapRef.current = map;
+    markersRef.current = markers;
 
-    // Add source and layer only after the map style has fully loaded
-    map.on("load", () => {
-      map.addSource("traces", {
-        type: "geojson",
-        data: {
-          type: "FeatureCollection",
-          features: [],
-        },
-      });
-
-      map.addLayer({
-        id: "traces-layer",
-        type: "circle",
-        source: "traces",
-        paint: {
-          "circle-radius": 5,
-          "circle-color": "#EF4444", // Tailwind's red-500
-        },
-      });
-      // Set state to indicate map is ready for data updates
-      setIsMapLoaded(true);
-    });
-
-    // Cleanup function
     return () => {
       if (mapRef.current) {
         mapRef.current.remove();
@@ -56,51 +36,36 @@ const MapComponent: React.FC = () => {
     };
   }, []);
 
-  // Effect for updating data (runs on location/filter changes and when map is loaded)
+  // Update markers based on data and filters
   useEffect(() => {
-    if (!isMapLoaded || !mapRef.current) {
-      return;
+    if (!markersRef.current) return;
+
+    // Clear existing markers
+    markersRef.current.clearLayers();
+
+    // Add new markers based on filtered data
+    Object.values(locations).forEach((trace) => {
+      const hasSelectedTag = trace.t.some((tag) => selectedTags.has(tag));
+      const isFiltered = selectedTags.size > 0 && !hasSelectedTag;
+
+      if (!isFiltered) {
+        trace.p.forEach((point) => {
+          const marker = L.marker([point[1], point[0]]);
+          marker.bindTooltip(`Tags: ${trace.t.join(", ")}`);
+          markersRef.current?.addLayer(marker);
+        });
+      }
+    });
+
+    // Optionally fit the map bounds to the markers
+    const allPoints = Object.values(locations).flatMap((trace) => trace.p);
+    if (allPoints.length > 0 && mapRef.current) {
+      const bounds = L.latLngBounds(allPoints.map((p) => [p[1], p[0]]));
+      mapRef.current.fitBounds(bounds, { padding: [50, 50] });
     }
+  }, [locations, selectedTags]);
 
-    const map = mapRef.current;
-
-    // Get the source. This is now safe because we know the map is loaded.
-    const source = map.getSource("traces") as
-      | maplibregl.GeoJSONSource
-      | undefined;
-
-    if (source) {
-      const geojson: GeoJSON.FeatureCollection = {
-        type: "FeatureCollection",
-        features: [],
-      };
-
-      Object.values(locations).forEach((trace) => {
-        const hasSelectedTag = trace.t.some((tag) => selectedTags.has(tag));
-        const isFiltered = selectedTags.size > 0 && !hasSelectedTag;
-
-        if (!isFiltered) {
-          // Add each point from the trace as a GeoJSON Feature
-          trace.p.forEach((point) => {
-            geojson.features.push({
-              type: "Feature",
-              geometry: {
-                type: "Point",
-                coordinates: [point[0], point[1]],
-              },
-              properties: {
-                tags: trace.t,
-              },
-            });
-          });
-        }
-      });
-
-      source.setData(geojson);
-    }
-  }, [isMapLoaded, locations, selectedTags]);
-
-  return <div ref={mapContainerRef} className="w-full h-screen" />;
+  return <div ref={mapContainerRef} className="w-full h-full z-0" />;
 };
 
 export default MapComponent;

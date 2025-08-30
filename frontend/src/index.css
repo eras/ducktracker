@@ -2,7 +2,20 @@
 @tailwind components;
 @tailwind utilities;
 
-body {
+html, body, #root {
+  height: 100%;
+  width: 100%;
   margin: 0;
+  padding: 0;
+  overflow: hidden; /* Prevents scrollbars on full-screen layouts */
+}
+
+body {
   font-family: sans-serif;
+}
+
+/* Ensure the leaflet container can fill its parent */
+.leaflet-container {
+  height: 100%;
+  width: 100%;
 }
