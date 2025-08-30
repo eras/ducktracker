@@ -18,7 +18,11 @@ const MapComponent: React.FC = () => {
 
     if (!mapContainerRef.current) return;
 
-    const map = L.map(mapContainerRef.current).setView([40.7128, -74.006], 12);
+    // Use default view for Helsinki, Finland
+    const map = L.map(mapContainerRef.current).setView(
+      [59.436962, 24.753574],
+      12,
+    );
 
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       attribution:
@@ -51,21 +55,20 @@ const MapComponent: React.FC = () => {
 
       if (!isFiltered) {
         trace.p.forEach((point) => {
-          const marker = L.marker([point[1], point[0]]);
+          // Use [lon, lat] order as requested
+          const marker = L.marker([point[0], point[1]]);
           marker.bindTooltip(`Tags: ${trace.t.join(", ")}`);
           markersRef.current?.addLayer(marker);
         });
       }
     });
 
-    // Optionally fit the map bounds to the markers
     const allPoints = Object.values(locations).flatMap((trace) => trace.p);
-    if (allPoints.length > 0 && mapRef.current) {
-      if (isFirstUpdateRef.current) {
-        const bounds = L.latLngBounds(allPoints.map((p) => [p[1], p[0]]));
-        mapRef.current.fitBounds(bounds, { padding: [50, 50], animate: false });
-        isFirstUpdateRef.current = false;
-      }
+    if (allPoints.length > 0 && mapRef.current && isFirstUpdateRef.current) {
+      // Use [lon, lat] order as requested
+      const bounds = L.latLngBounds(allPoints.map((p) => [p[0], p[1]]));
+      mapRef.current.fitBounds(bounds, { padding: [50, 50], animate: false });
+      isFirstUpdateRef.current = false;
     }
   }, [locations, selectedTags]);
 
