@@ -27,7 +27,7 @@ class HaukApiTest(unittest.TestCase):
                 "usr": "testuser",
                 "pwd": "testpassword",
                 "mod": 0,
-                "lid": "testshareid",
+                "lid": "test_create_and_fetch_session",
                 "dur": 3600,
                 "int": 30,
             }
@@ -72,7 +72,7 @@ class HaukApiTest(unittest.TestCase):
                 "usr": "testuser",
                 "pwd": "testpassword",
                 "mod": 0,
-                "lid": "testshareid",
+                "lid": "test_post_and_fetch_location",
                 "dur": 3600,
                 "int": 30,
             }
