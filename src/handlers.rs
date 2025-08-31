@@ -49,6 +49,7 @@ pub async fn create_session(
     data: web::Form<CreateRequest>,
     state: web::Data<AppState>,
 ) -> impl Responder {
+    let mut state = state.lock().await;
     let session_id = generate_id();
 
     // Check if a session with this ID already exists.
@@ -108,40 +109,21 @@ pub async fn post_location(
     data: web::Form<PostRequest>,
     state: web::Data<AppState>,
 ) -> impl Responder {
-    // Find and get a mutable reference to the session from the DashMap.
-    let mut session = match state.sessions.get_mut(&data.session_id) {
-        Some(s) => s,
-        None => return HttpResponse::NotFound().body("Session not found."),
-    };
+    let mut state = state.lock().await;
+    match state.add_location(&data).await {
+        Err(state::Error::NoSuchSession) => HttpResponse::NotFound().body("Session not found."),
+        Err(state::Error::SessionExpired) => HttpResponse::Gone().body("Session has expired."),
+        Ok(()) => {
+            let response = PostResponse {
+                public_url: "http://localhost".to_string(), // TODO
+                target_ids: Vec::new(),
+            };
 
-    let now = Utc::now();
-    if session.expires_at < now {
-        drop(session);
-        state.sessions.remove(&data.session_id);
-        return HttpResponse::Gone().body("Session has expired.");
+            HttpResponse::Ok()
+                .content_type("text/plain")
+                .body(response.to_client())
+        }
     }
-
-    // Create a new Location struct with the provided data.
-    let new_location = Location {
-        lat: data.latitude,
-        lon: data.longitude,
-        acc: data.accuracy,
-        spd: data.speed,
-        provider: data.provider.unwrap_or(0),
-        time: data.time,
-    };
-
-    // Update the last_location field of the session.
-    session.locations.push(new_location);
-
-    let response = PostResponse {
-        public_url: "http://localhost".to_string(), // TODO
-        target_ids: Vec::new(),
-    };
-
-    HttpResponse::Ok()
-        .content_type("text/plain")
-        .body(response.to_client())
 }
 
 /// Handler for the `/api/fetch` endpoint.
@@ -152,6 +134,8 @@ pub async fn fetch_location(
     data: web::Query<FetchRequest>,
     state: web::Data<AppState>,
 ) -> impl Responder {
+    let state = state.lock().await;
+
     // Look up the session in the DashMap using the share link token.
     let session = state
         .sessions
@@ -191,8 +175,8 @@ pub async fn fetch_location(
 
 #[actix_web::get("/api/stream")]
 async fn stream(state: web::Data<AppState>) -> impl Responder {
-    let updates = state.updates.updates().await;
-
+    let state = state.lock().await;
+    let updates = state.updates.updates(&state).await;
     let events = futures_util::StreamExt::map(updates, |update| {
         let update = update.expect("woot, there should have been an update..");
         let json_data = serde_json::to_string(&update).expect("Failed to encode Update to JSON");

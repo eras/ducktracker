@@ -1,8 +1,8 @@
 use actix_cors::Cors;
 use actix_web::{App, HttpServer, middleware::Logger, web};
-use dashmap::DashMap;
 use log::info;
 use std::sync::Arc;
+use tokio::sync::Mutex;
 use tracing_subscriber::{EnvFilter, FmtSubscriber};
 
 mod handlers;
@@ -12,12 +12,9 @@ mod state;
 // The central, shared application state. We use an Arc to allow multiple
 // worker threads to share the state, and a DashMap for thread-safe
 // concurrent access to the session data.
-pub struct State {
-    sessions: DashMap<String, models::Session>,
-    updates: state::Updates,
-}
+pub use state::State;
 
-pub type AppState = Arc<State>;
+pub type AppState = Arc<Mutex<State>>;
 
 /// Main function to set up and run the `actix-web` server.
 #[actix_web::main]
@@ -33,10 +30,10 @@ async fn main() -> std::io::Result<()> {
     // Create the shared application state.
     let (updates_tx, _updates_rx) = tokio::sync::broadcast::channel(10);
     let updates = state::Updates { updates_tx };
-    let app_state: AppState = Arc::new(State {
-        sessions: DashMap::new(),
+    let app_state: AppState = Arc::new(Mutex::new(State {
+        sessions: dashmap::DashMap::new(),
         updates,
-    });
+    }));
 
     info!("Starting server at http://127.0.0.1:8080");
 

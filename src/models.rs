@@ -140,7 +140,7 @@ impl Serialize for ShareType {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct TimeUsec(pub std::time::SystemTime);
 
 pub type Nick = String;
@@ -170,4 +170,19 @@ pub struct FetchResponse {
     pub server_time: TimeUsec,
     pub interval: u64,
     pub points: HashMap<Nick, Vec<Location>>,
+}
+
+#[derive(Debug, Serialize, Clone)]
+pub struct Update {
+    #[serde(rename = "serverTime")]
+    pub server_time: TimeUsec,
+    pub interval: u64,
+    pub changes: Vec<UpdateChange>,
+}
+
+#[derive(Debug, Serialize, Clone)]
+pub enum UpdateChange {
+    Loc {
+        points: HashMap<Nick, Vec<Location>>,
+    },
 }
