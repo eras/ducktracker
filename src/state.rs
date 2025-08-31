@@ -25,6 +25,25 @@ impl State {
         }
     }
 
+    pub fn add_tags(&mut self, fetch_id: models::FetchId, tags_aux: models::TagsAux) {
+        for (tag, visibility) in tags_aux.0.iter() {
+            if *visibility == models::TagVisibility::Public {
+                self.public_tags.0.insert(tag.clone());
+            }
+        }
+
+        let tags: models::Tags = tags_aux.into();
+        let context = UpdateContext { tags: tags.clone() };
+        let mut new_tags = HashMap::new();
+        new_tags.insert(fetch_id.clone(), tags);
+        let update = Update {
+            server_time: models::TimeUsec(std::time::SystemTime::now()),
+            interval: 0u64,
+            changes: [UpdateChange::AddTags { tags: new_tags }].to_vec(),
+        };
+        self.updates.send_update(context, update);
+    }
+
     pub fn generate_fetch_id(&mut self) -> models::FetchId {
         let id = self.next_fetch_id.clone();
         self.next_fetch_id.0 += 1;

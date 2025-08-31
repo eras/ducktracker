@@ -145,6 +145,7 @@ pub enum TagVisibility {
     Public,
 }
 
+#[derive(Debug, Clone)]
 pub struct TagsAux(pub HashSet<(Tag, TagVisibility)>);
 
 impl Into<Tags> for TagsAux {
@@ -196,6 +197,16 @@ impl TagsAux {
                 TagsAux(tags)
             }
         }
+    }
+
+    pub fn public_tags(&self) -> Tags {
+        self.0
+            .iter()
+            .filter_map(|(tag, visibility)| match visibility {
+                TagVisibility::Private => None,
+                TagVisibility::Public => Some(tag.clone()),
+            })
+            .collect()
     }
 }
 

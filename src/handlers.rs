@@ -77,16 +77,19 @@ pub async fn create_session(
 
     let tags_aux = models::TagsAux::from_share_id(&data.share_id);
 
+    let fetch_id = state.generate_fetch_id();
+
     // Create a new session and store it in the DashMap.
     let new_session = Session {
         session_id: session_id.clone(),
         password_hash,
         locations: Vec::new(),
         expires_at,
-        fetch_id: state.generate_fetch_id(),
-        tags: tags_aux.into(),
+        fetch_id: fetch_id.clone(),
+        tags: tags_aux.clone().into(),
     };
     state.sessions.insert(session_id.clone(), new_session);
+    state.add_tags(fetch_id, tags_aux);
 
     // Construct the response.
     let response = CreateResponse {
