@@ -203,16 +203,3 @@ async fn stream(state: web::Data<AppState>) -> impl Responder {
 
     actix_web_lab::sse::Sse::from_stream(events).with_keep_alive(std::time::Duration::from_secs(5))
 }
-
-#[actix_web::get("/api/test")]
-async fn test(state: web::Data<AppState>) -> impl Responder {
-    state
-        .updates
-        .updates_tx
-        .send(state::Update {
-            message: "hello".to_string(),
-        })
-        .unwrap();
-
-    HttpResponse::Ok().content_type("text/plain").body("")
-}

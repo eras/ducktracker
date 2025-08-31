@@ -53,7 +53,6 @@ async fn main() -> std::io::Result<()> {
             .service(handlers::post_location)
             .service(handlers::fetch_location)
             .service(handlers::stream)
-            .service(handlers::test)
     })
     .bind(("0.0.0.0", 8080))?
     .run()
