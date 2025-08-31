@@ -49,29 +49,21 @@ pub async fn create_session(
     state: web::Data<AppState>,
 ) -> impl Responder {
     let mut state = state.lock().await;
-    let session_id = models::SessionId(generate_id());
 
-    // Generate a unique share link token.
-    let share_id = models::ShareId(data.share_id.clone().unwrap_or_else(|| generate_id()));
-    let share_link = format!("http://127.0.0.1/{share_id}");
+    let tags_aux = models::TagsAux::from_share_id(&data.share_id);
 
     // Calculate the expiration time.
     let expires_at = Utc::now() + Duration::seconds(data.duration as i64);
 
-    let tags_aux = models::TagsAux::from_share_id(&data.share_id);
+    let session_id = state.add_session(expires_at, tags_aux);
 
-    let fetch_id = state.generate_fetch_id();
-
-    // Create a new session and store it in the DashMap.
-    let new_session = Session {
-        session_id: session_id.clone(),
-        locations: Vec::new(),
-        expires_at,
-        fetch_id: fetch_id.clone(),
-        tags: tags_aux.clone().into(),
-    };
-    state.sessions.insert(session_id.clone(), new_session);
-    state.add_tags(fetch_id, tags_aux);
+    // Generate a unique share link token.
+    let share_id = models::ShareId(
+        data.share_id
+            .clone()
+            .unwrap_or_else(|| crate::handlers::generate_id()),
+    );
+    let share_link = format!("http://127.0.0.1/{share_id}");
 
     // Construct the response.
     let response = CreateResponse {

@@ -1,15 +1,19 @@
 use crate::models::{self, Location, Update, UpdateChange};
-use std::{collections::HashMap, pin::Pin};
-use tokio::sync::broadcast;
+use chrono::Utc;
+use std::{collections::HashMap, pin::Pin, sync::Arc};
+use tokio::sync::{RwLock, broadcast};
 
 pub enum Error {
     NoSuchSession,
     SessionExpired,
 }
 
+pub type FetchIdTagsMap = HashMap<models::FetchId, models::Tags>;
+
 pub struct State {
     pub sessions: dashmap::DashMap<models::SessionId, models::Session>,
     pub updates: Updates,
+    fetch_id_tags_map: Arc<RwLock<FetchIdTagsMap>>,
     public_tags: models::Tags,
 
     next_fetch_id: models::FetchId,
@@ -22,7 +26,30 @@ impl State {
             sessions: dashmap::DashMap::new(),
             next_fetch_id: models::FetchId(0u64),
             public_tags: models::Tags::new(),
+            fetch_id_tags_map: Arc::new(RwLock::new(FetchIdTagsMap::new())),
         }
+    }
+
+    pub fn add_session(
+        &mut self,
+        expires_at: chrono::DateTime<Utc>,
+        tags_aux: models::TagsAux,
+    ) -> models::SessionId {
+        let session_id = models::SessionId(crate::handlers::generate_id());
+        let fetch_id = self.generate_fetch_id();
+
+        // Create a new session and store it in the DashMap.
+        let new_session = models::Session {
+            session_id: session_id.clone(),
+            locations: Vec::new(),
+            expires_at,
+            fetch_id: fetch_id.clone(),
+            tags: tags_aux.clone().into(),
+        };
+        self.sessions.insert(session_id.clone(), new_session);
+        self.add_tags(fetch_id, tags_aux);
+
+        session_id
     }
 
     pub fn make_fetch_id_tag_map(&self) -> HashMap<models::FetchId, models::Tags> {
