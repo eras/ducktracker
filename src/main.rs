@@ -8,6 +8,7 @@ use tracing_subscriber::{EnvFilter, FmtSubscriber};
 mod handlers;
 mod models;
 mod state;
+mod utils;
 
 // The central, shared application state. We use an Arc to allow multiple
 // worker threads to share the state, and a DashMap for thread-safe

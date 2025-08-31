@@ -158,6 +158,23 @@ impl std::fmt::Display for SessionId {
 #[derive(Debug, Clone, Serialize, Deserialize, Hash, Eq, PartialEq)]
 pub struct ShareId(pub String);
 
+#[derive(Debug, Clone, Serialize, Deserialize, Hash, Eq, PartialEq)]
+pub struct Tag(pub String);
+
+impl std::str::FromStr for Tag {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(Self(s.to_string()))
+    }
+}
+
+impl std::fmt::Display for Tag {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{0}", self.0)
+    }
+}
+
 impl std::fmt::Display for ShareId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{0}", self.0)
@@ -211,4 +228,10 @@ pub enum UpdateChange {
     Add {
         points: HashMap<FetchId, Vec<Location>>,
     },
+}
+
+/// Request body for the /api/stream endpoint.
+#[derive(Debug, Deserialize)]
+pub struct StreamRequest {
+    pub tags: crate::utils::CommaSeparatedVec<Tag>,
 }

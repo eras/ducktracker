@@ -175,7 +175,11 @@ pub async fn fetch_location(
 }
 
 #[actix_web::get("/api/stream")]
-async fn stream(state: web::Data<AppState>) -> impl Responder {
+async fn stream(
+    data: web::Query<models::StreamRequest>,
+    state: web::Data<AppState>,
+) -> impl Responder {
+    info!("data: {}", data.tags);
     let state = state.lock().await;
     let updates = state.updates.updates(&state).await;
     let events = futures_util::StreamExt::map(updates, |update| {
