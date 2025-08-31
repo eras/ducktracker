@@ -19,6 +19,18 @@ pub struct State {
     next_fetch_id: models::FetchId,
 }
 
+#[derive(Clone)]
+pub struct FetchIdTagsMapAccessor {
+    fetch_id_tags_map: Arc<RwLock<FetchIdTagsMap>>,
+}
+
+impl FetchIdTagsMapAccessor {
+    pub async fn get(&self, fetch_id: &models::FetchId) -> models::Tags {
+	let fetch_id_tags_map = self.fetch_id_tags_map.read().await;
+	fetch_id_tags_map.get(fetch_id).unwrap_or(&models::Tags::new()).clone()
+    }
+}
+
 impl State {
     pub fn new(updates: Updates) -> Self {
         Self {
@@ -30,7 +42,7 @@ impl State {
         }
     }
 
-    pub fn add_session(
+    pub async fn add_session(
         &mut self,
         expires_at: chrono::DateTime<Utc>,
         tags_aux: models::TagsAux,
@@ -47,22 +59,18 @@ impl State {
             tags: tags_aux.clone().into(),
         };
         self.sessions.insert(session_id.clone(), new_session);
-        self.add_tags(fetch_id, tags_aux);
+        self.add_tags(fetch_id, tags_aux).await;
 
         session_id
     }
 
-    pub fn make_fetch_id_tag_map(&self) -> HashMap<models::FetchId, models::Tags> {
-        let mut map = HashMap::new();
-
-        for x in self.sessions.iter() {
-            map.insert(x.value().fetch_id.clone(), x.value().tags.clone());
+    pub fn make_fetch_id_tag_map_accessor(&self) -> FetchIdTagsMapAccessor {
+        FetchIdTagsMapAccessor {
+            fetch_id_tags_map: self.fetch_id_tags_map.clone(),
         }
-
-        map
     }
 
-    pub fn add_tags(&mut self, fetch_id: models::FetchId, tags_aux: models::TagsAux) {
+    pub async fn add_tags(&mut self, fetch_id: models::FetchId, tags_aux: models::TagsAux) {
         for (tag, visibility) in tags_aux.0.iter() {
             if *visibility == models::TagVisibility::Public {
                 self.public_tags.0.insert(tag.clone());
@@ -70,6 +78,12 @@ impl State {
         }
 
         let tags: models::Tags = tags_aux.into();
+
+        {
+            let mut fetch_id_tags_map = self.fetch_id_tags_map.write().await;
+            fetch_id_tags_map.insert(fetch_id.clone(), tags.clone());
+        }
+
         let context = UpdateContext { tags: tags.clone() };
         let mut new_tags = HashMap::new();
         new_tags.insert(fetch_id.clone(), tags);
@@ -209,21 +223,21 @@ impl Updates {
         let first_stream =
             futures_util::stream::once(async move { UpdateBroadcast::Ok(initial_message) });
 
-        let fetch_id_tag_map = state.make_fetch_id_tag_map();
+        let fetch_id_tag_map_accessor = state.make_fetch_id_tag_map_accessor();
 
         // Filter our messages this subscription doesn't see
         // Modify tags so that the client doesn't learn about new tags
         let updates = {
             futures_util::StreamExt::filter_map(updates, move |x| {
                 let filter_tags = tags.clone();
-                let fetch_id_tag_map = fetch_id_tag_map.clone();
+                let fetch_id_tag_map_accessor = fetch_id_tag_map_accessor.clone();
                 async move {
                     match x {
                         Ok((context, update)) => {
                             let shared_tags = &context.tags & &filter_tags;
                             if shared_tags.len() > 0 {
                                 let shared_context = UpdateContext { tags: shared_tags };
-                                match update.filter_map(&filter_tags, &fetch_id_tag_map) {
+                                match update.filter_map(&filter_tags, &fetch_id_tag_map_accessor).await {
                                     None => None,
                                     Some(update) => Some(Ok((shared_context, update))),
                                 }

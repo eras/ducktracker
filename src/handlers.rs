@@ -55,7 +55,7 @@ pub async fn create_session(
     // Calculate the expiration time.
     let expires_at = Utc::now() + Duration::seconds(data.duration as i64);
 
-    let session_id = state.add_session(expires_at, tags_aux);
+    let session_id = state.add_session(expires_at, tags_aux).await;
 
     // Generate a unique share link token.
     let share_id = models::ShareId(
@@ -112,7 +112,6 @@ async fn stream(
 ) -> impl Responder {
     info!("data: {}", data.tags);
     let state = app_state.lock().await;
-    let fetch_id_tag_map = state.make_fetch_id_tag_map();
     let updates = state
         .updates
         .updates(&state, data.tags.0.iter().map(|x| x.clone()).collect())

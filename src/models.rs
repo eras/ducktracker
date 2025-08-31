@@ -1,6 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use chrono::{DateTime, Utc};
+use futures::stream::{self, StreamExt};
 use serde::{Deserialize, Serialize};
 
 /// Represents the current location data for a session.
@@ -257,16 +258,15 @@ pub struct Update {
 }
 
 impl Update {
-    pub fn filter_map(
+    pub async fn filter_map(
         self,
         filter_tags: &Tags,
-        fetch_id_tag_map: &HashMap<FetchId, Tags>,
+        fetch_id_tag_map_accessor: &crate::state::FetchIdTagsMapAccessor,
     ) -> Option<Update> {
-        let changes: Vec<_> = self
-            .changes
-            .into_iter()
-            .filter_map(|x| x.filter_map(filter_tags, fetch_id_tag_map))
-            .collect();
+        let changes: Vec<_> = stream::iter(self.changes)
+            .filter_map(|x| x.filter_map(filter_tags, fetch_id_tag_map_accessor))
+            .collect()
+            .await;
         if changes.len() > 0 {
             Some(Update { changes, ..self })
         } else {
@@ -299,12 +299,11 @@ pub enum UpdateChange {
 impl UpdateChange {
     // Filter the UpdateChange so that it includes only information relevant to a certain tag subscriptions
     // state is used to find out tags for sources referred by their fetch_ids
-    fn filter_map(
+    async fn filter_map(
         self,
         filter_tags: &Tags,
-        fetch_id_tag_map: &HashMap<FetchId, Tags>,
+        fetch_id_tag_map_accessor: &crate::state::FetchIdTagsMapAccessor,
     ) -> Option<UpdateChange> {
-        let no_tags = Tags::new();
         match self {
             Self::Reset => Some(self.clone()),
             Self::AddTags { tags, public } => {
@@ -325,23 +324,22 @@ impl UpdateChange {
                 })
             }
             Self::Add { points } => {
-                let points = points
-                    .into_iter()
-                    .filter_map(|(fetch_id, locations)| {
+                let points = stream::iter(points)
+                    .filter_map(|(fetch_id, locations)| async move {
                         let shared_tags =
-                            fetch_id_tag_map.get(&fetch_id).unwrap_or(&no_tags) & &filter_tags;
+                            &fetch_id_tag_map_accessor.get(&fetch_id).await & filter_tags;
                         if shared_tags.len() > 0 {
                             Some((fetch_id, locations))
                         } else {
                             None
                         }
                     })
-                    .collect();
+                    .collect()
+                    .await;
                 Some(UpdateChange::Add { points })
             }
             Self::ExpireFetch { fetch_id } => {
-                let shared_tags =
-                    fetch_id_tag_map.get(&fetch_id).unwrap_or(&no_tags) & &filter_tags;
+                let shared_tags = &fetch_id_tag_map_accessor.get(&fetch_id).await & filter_tags;
                 if shared_tags.len() > 0 {
                     Some(UpdateChange::ExpireFetch { fetch_id })
                 } else {
