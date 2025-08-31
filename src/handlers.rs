@@ -51,23 +51,6 @@ pub async fn create_session(
     let mut state = state.lock().await;
     let session_id = models::SessionId(generate_id());
 
-    // Check if a session with this ID already exists.
-    if state.sessions.contains_key(&session_id) {
-        return HttpResponse::BadRequest().body("Session ID already exists.");
-    }
-
-    // Hash the password for secure storage.
-    let password = data.password.clone().unwrap_or_else(|| {
-        thread_rng()
-            .sample_iter(&Alphanumeric)
-            .take(32)
-            .map(char::from)
-            .collect()
-    });
-    let mut hasher = Sha256::new();
-    hasher.update(password.as_bytes());
-    let password_hash = hex::encode(hasher.finalize());
-
     // Generate a unique share link token.
     let share_id = models::ShareId(data.share_id.clone().unwrap_or_else(|| generate_id()));
     let share_link = format!("http://127.0.0.1/{share_id}");
@@ -82,7 +65,6 @@ pub async fn create_session(
     // Create a new session and store it in the DashMap.
     let new_session = Session {
         session_id: session_id.clone(),
-        password_hash,
         locations: Vec::new(),
         expires_at,
         fetch_id: fetch_id.clone(),

@@ -21,7 +21,6 @@ pub struct Location {
 #[derive(Debug, Clone)]
 pub struct Session {
     pub session_id: SessionId,
-    pub password_hash: String,
     pub locations: Vec<Location>,
     pub expires_at: DateTime<Utc>,
     pub fetch_id: FetchId,
