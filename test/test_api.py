@@ -33,7 +33,11 @@ class Add(BaseModel):
     add: AddPoints
 
 
-Change = Literal["reset"] | AddTags | Add
+class ExpireFetch(BaseModel):
+    fetch_id: str
+
+
+Change = Literal["reset"] | AddTags | Add | ExpireFetch
 
 
 # Root model for the list of commands
