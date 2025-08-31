@@ -65,19 +65,31 @@ impl State {
             changes: [UpdateChange::Add { points }].to_vec(),
         };
 
-        self.updates.updates_tx.send(update).unwrap();
+        self.updates.send_update(update);
 
         Ok(())
     }
 }
 
 pub struct Updates {
-    pub updates_tx: broadcast::Sender<Update>,
+    updates_tx: broadcast::Sender<Update>,
 }
 
 pub type UpdateBroadcast = Result<Update, tokio_stream::wrappers::errors::BroadcastStreamRecvError>;
 
 impl Updates {
+    pub fn new() -> Self {
+        let (updates_tx, _updates_rx) = tokio::sync::broadcast::channel(10);
+        Self { updates_tx }
+    }
+
+    fn send_update(&self, context: UpdateContext, update: Update) {
+        match self.updates_tx.send((context, update)) {
+            Ok(_) => (),
+            Err(_) => (), // this is fine.. it happens when there are no subscribers.
+        }
+    }
+
     fn initial_update(&self, state: &State) -> Update {
         let points = state
             .sessions

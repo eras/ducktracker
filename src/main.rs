@@ -29,8 +29,7 @@ async fn main() -> std::io::Result<()> {
         .init();
 
     // Create the shared application state.
-    let (updates_tx, _updates_rx) = tokio::sync::broadcast::channel(10);
-    let updates = state::Updates { updates_tx };
+    let updates = state::Updates::new();
     let app_state: AppState = Arc::new(Mutex::new(State::new(updates)));
 
     info!("Starting server at http://127.0.0.1:8080");
