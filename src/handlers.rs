@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::AppState;
 use crate::models::{
-    CreateRequest, CreateResponse, FetchRequest, FetchResponse, Location, PostRequest,
+    self, CreateRequest, CreateResponse, FetchRequest, FetchResponse, Location, PostRequest,
     PostResponse, Session, ShareType, TimeUsec,
 };
 use crate::state;
@@ -50,7 +50,7 @@ pub async fn create_session(
     state: web::Data<AppState>,
 ) -> impl Responder {
     let mut state = state.lock().await;
-    let session_id = generate_id();
+    let session_id = models::SessionId(generate_id());
 
     // Check if a session with this ID already exists.
     if state.sessions.contains_key(&session_id) {
@@ -70,7 +70,7 @@ pub async fn create_session(
     let password_hash = hex::encode(hasher.finalize());
 
     // Generate a unique share link token.
-    let share_id: String = data.share_id.clone().unwrap_or_else(|| generate_id());
+    let share_id = models::ShareId(data.share_id.clone().unwrap_or_else(|| generate_id()));
     let share_link = format!("http://127.0.0.1/{share_id}");
 
     // Calculate the expiration time.
@@ -83,6 +83,7 @@ pub async fn create_session(
         share_id: share_id.clone(),
         locations: Vec::new(),
         expires_at,
+        fetch_id: state.generate_fetch_id(),
     };
     state.sessions.insert(session_id.clone(), new_session);
 
@@ -160,7 +161,7 @@ pub async fn fetch_location(
     let points: Vec<Location> = session.locations.clone();
 
     let mut all_points = HashMap::new();
-    all_points.insert("hello".into(), points);
+    all_points.insert(models::FetchId(0u64), points);
 
     let response = FetchResponse {
         type_: ShareType::Group,

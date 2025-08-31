@@ -8,11 +8,27 @@ pub enum Error {
 }
 
 pub struct State {
-    pub sessions: dashmap::DashMap<String, models::Session>,
+    pub sessions: dashmap::DashMap<models::SessionId, models::Session>,
     pub updates: Updates,
+
+    next_fetch_id: models::FetchId,
 }
 
 impl State {
+    pub fn new(updates: Updates) -> Self {
+        Self {
+            updates,
+            sessions: dashmap::DashMap::new(),
+            next_fetch_id: models::FetchId(0u64),
+        }
+    }
+
+    pub fn generate_fetch_id(&mut self) -> models::FetchId {
+        let id = self.next_fetch_id.clone();
+        self.next_fetch_id.0 += 1;
+        id
+    }
+
     pub async fn add_location(&mut self, data: &models::PostRequest) -> Result<(), Error> {
         // Find and get a mutable reference to the session from the DashMap.
         let mut session = match self.sessions.get_mut(&data.session_id) {
@@ -41,12 +57,12 @@ impl State {
         session.locations.push(new_location.clone());
 
         let mut points = std::collections::HashMap::new();
-        points.insert("hello".to_string(), [new_location].to_vec());
+        points.insert(session.fetch_id, [new_location].to_vec());
 
         let update = Update {
             server_time: models::TimeUsec(std::time::SystemTime::now()),
             interval: 0u64,
-            changes: [UpdateChange::Loc { points }].to_vec(),
+            changes: [UpdateChange::Add { points }].to_vec(),
         };
 
         self.updates.updates_tx.send(update).unwrap();
@@ -66,12 +82,12 @@ impl Updates {
         let points = state
             .sessions
             .iter()
-            .map(|x| (x.key().clone(), x.value().locations.clone()))
+            .map(|x| (x.value().fetch_id, x.value().locations.clone()))
             .collect();
         Update {
             server_time: models::TimeUsec(std::time::SystemTime::now()),
             interval: 0u64,
-            changes: [UpdateChange::Loc { points }].to_vec(),
+            changes: [UpdateChange::Reset, UpdateChange::Add { points }].to_vec(),
         }
     }
 

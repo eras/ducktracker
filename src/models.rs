@@ -20,11 +20,12 @@ pub struct Location {
 /// Represents a single tracking session. This data is stored in memory.
 #[derive(Debug, Clone)]
 pub struct Session {
-    pub session_id: String,
+    pub session_id: SessionId,
     pub password_hash: String,
-    pub share_id: String,
+    pub share_id: ShareId,
     pub locations: Vec<Location>,
     pub expires_at: DateTime<Utc>,
+    pub fetch_id: FetchId,
 }
 
 // ========================
@@ -52,9 +53,9 @@ pub struct CreateRequest {
 #[derive(Debug)]
 pub struct CreateResponse {
     pub status: String,
-    pub session_id: String,
+    pub session_id: SessionId,
     pub share_link: String,
-    pub share_id: String,
+    pub share_id: ShareId,
 }
 
 impl CreateResponse {
@@ -70,7 +71,7 @@ impl CreateResponse {
 #[derive(Debug, Deserialize)]
 pub struct PostRequest {
     #[serde(rename = "sid")]
-    pub session_id: String,
+    pub session_id: SessionId,
     #[serde(rename = "prv")]
     pub provider: Option<u64>,
     pub time: f64,
@@ -101,7 +102,7 @@ impl PostResponse {
 #[derive(Debug, Deserialize)]
 pub struct FetchRequest {
     #[serde(rename = "id")]
-    pub share_id: String,
+    pub share_id: ShareId,
 }
 
 impl Serialize for Location {
@@ -143,7 +144,29 @@ impl Serialize for ShareType {
 #[derive(Debug, Clone)]
 pub struct TimeUsec(pub std::time::SystemTime);
 
-pub type Nick = String;
+// Given to each new publish session
+#[derive(Debug, Clone, Serialize, Deserialize, Hash, Eq, PartialEq)]
+pub struct SessionId(pub String);
+
+impl std::fmt::Display for SessionId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{0}", self.0)
+    }
+}
+
+// Useless?
+#[derive(Debug, Clone, Serialize, Deserialize, Hash, Eq, PartialEq)]
+pub struct ShareId(pub String);
+
+impl std::fmt::Display for ShareId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{0}", self.0)
+    }
+}
+
+// Id used when providing data back to clients
+#[derive(Debug, Copy, Clone, Serialize, Deserialize, Hash, Eq, PartialEq)]
+pub struct FetchId(pub u64);
 
 impl Serialize for TimeUsec {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -169,7 +192,7 @@ pub struct FetchResponse {
     #[serde(rename = "serverTime")]
     pub server_time: TimeUsec,
     pub interval: u64,
-    pub points: HashMap<Nick, Vec<Location>>,
+    pub points: HashMap<FetchId, Vec<Location>>,
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -182,7 +205,10 @@ pub struct Update {
 
 #[derive(Debug, Serialize, Clone)]
 pub enum UpdateChange {
-    Loc {
-        points: HashMap<Nick, Vec<Location>>,
+    #[serde(rename = "reset")]
+    Reset,
+    #[serde(rename = "add")]
+    Add {
+        points: HashMap<FetchId, Vec<Location>>,
     },
 }

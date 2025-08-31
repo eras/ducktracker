@@ -30,10 +30,7 @@ async fn main() -> std::io::Result<()> {
     // Create the shared application state.
     let (updates_tx, _updates_rx) = tokio::sync::broadcast::channel(10);
     let updates = state::Updates { updates_tx };
-    let app_state: AppState = Arc::new(Mutex::new(State {
-        sessions: dashmap::DashMap::new(),
-        updates,
-    }));
+    let app_state: AppState = Arc::new(Mutex::new(State::new(updates)));
 
     info!("Starting server at http://127.0.0.1:8080");
 
