@@ -17,12 +17,12 @@ def random_string() -> str:
     return "".join(random.choices(string.ascii_letters + string.digits, k=4))
 
 
-class SetTagsTags(BaseModel):
+class AddTagsTags(BaseModel):
     tags: dict[str, Any]
 
 
-class SetTags(BaseModel):
-    set_tags: SetTagsTags
+class AddTags(BaseModel):
+    add_tags: AddTagsTags
 
 
 class AddPoints(BaseModel):
@@ -33,7 +33,7 @@ class Add(BaseModel):
     add: AddPoints
 
 
-Change = Literal["reset"] | SetTags | Add
+Change = Literal["reset"] | AddTags | Add
 
 
 # Root model for the list of commands
@@ -105,7 +105,7 @@ class HaukApiTest(unittest.TestCase):
             stream_sse = self.stream_sse([tag])
             first = next(stream_sse)
             self.assertEqual(first.changes[0], "reset")
-            self.assertEqual(list(first.changes[1].set_tags.tags.values()), [[tag]])
+            self.assertEqual(list(first.changes[1].add_tags.tags.values()), [[tag]])
             self.assertEqual(list(first.changes[2].add.points.values()), [[]])
 
         except requests.exceptions.RequestException as e:
@@ -162,7 +162,7 @@ class HaukApiTest(unittest.TestCase):
             stream_sse = self.stream_sse([tag])
             first = next(stream_sse)
             self.assertEqual(first.changes[0], "reset")
-            self.assertEqual(list(first.changes[1].set_tags.tags.values()), [[tag]])
+            self.assertEqual(list(first.changes[1].add_tags.tags.values()), [[tag]])
             points = list(first.changes[2].add.points.values())
             self.assertAlmostEqual(points[0][0][0], location_data["lat"])
             self.assertAlmostEqual(points[0][0][1], location_data["lon"])

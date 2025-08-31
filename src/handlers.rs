@@ -134,10 +134,11 @@ pub async fn post_location(
 #[actix_web::get("/api/stream")]
 async fn stream(
     data: web::Query<models::StreamRequest>,
-    state: web::Data<AppState>,
+    app_state: web::Data<AppState>,
 ) -> impl Responder {
     info!("data: {}", data.tags);
-    let state = state.lock().await;
+    let state = app_state.lock().await;
+    let fetch_id_tag_map = state.make_fetch_id_tag_map();
     let updates = state
         .updates
         .updates(&state, data.tags.0.iter().map(|x| x.clone()).collect())
