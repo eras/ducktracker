@@ -45,7 +45,6 @@ async fn main() -> std::io::Result<()> {
             .app_data(web::Data::new(app_state.clone()))
             .service(handlers::create_session)
             .service(handlers::post_location)
-            .service(handlers::fetch_location)
             .service(handlers::stream)
     })
     .bind(("0.0.0.0", 8080))?

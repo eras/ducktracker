@@ -2,8 +2,7 @@ use std::collections::HashMap;
 
 use crate::AppState;
 use crate::models::{
-    self, CreateRequest, CreateResponse, FetchRequest, FetchResponse, Location, PostRequest,
-    PostResponse, Session, ShareType, TimeUsec,
+    self, CreateRequest, CreateResponse, Location, PostRequest, PostResponse, Session, TimeUsec,
 };
 use crate::state;
 use actix_web::{HttpResponse, Responder, get, post, web};
@@ -125,53 +124,6 @@ pub async fn post_location(
                 .body(response.to_client())
         }
     }
-}
-
-/// Handler for the `/api/fetch` endpoint.
-///
-/// This function retrieves the latest location data for a session.
-#[get("/api/fetch.php")]
-pub async fn fetch_location(
-    data: web::Query<FetchRequest>,
-    state: web::Data<AppState>,
-) -> impl Responder {
-    let state = state.lock().await;
-
-    // Look up the session in the DashMap using the share link token.
-    let session = state
-        .sessions
-        .iter()
-        .find(|entry| entry.share_id == data.share_id);
-
-    let session = match session {
-        Some(s) => s,
-        None => return HttpResponse::NotFound().body("Share link invalid or session not found."),
-    };
-
-    // Check if the session has expired.
-    let now = Utc::now();
-    if session.expires_at < now {
-        return HttpResponse::Gone().body("Session has expired.");
-    }
-
-    // Calculate time remaining until expiration.
-    let time_remaining = session.expires_at.signed_duration_since(now).num_seconds();
-
-    // Construct the response.
-    let points: Vec<Location> = session.locations.clone();
-
-    let mut all_points = HashMap::new();
-    all_points.insert(models::FetchId(0u64), points);
-
-    let response = FetchResponse {
-        type_: ShareType::Group,
-        expire: 0.0f64,
-        server_time: TimeUsec(std::time::SystemTime::now()),
-        interval: 0u64,
-        points: all_points,
-    };
-
-    HttpResponse::Ok().json(response)
 }
 
 #[actix_web::get("/api/stream")]

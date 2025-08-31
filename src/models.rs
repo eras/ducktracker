@@ -98,13 +98,6 @@ impl PostResponse {
     }
 }
 
-/// Request body for the /api/fetch endpoint.
-#[derive(Debug, Deserialize)]
-pub struct FetchRequest {
-    #[serde(rename = "id")]
-    pub share_id: ShareId,
-}
-
 impl Serialize for Location {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -120,24 +113,6 @@ impl Serialize for Location {
         state.serialize_element(&self.acc)?;
         state.serialize_element(&self.provider)?;
         state.end()
-    }
-}
-
-#[derive(Debug)]
-pub enum ShareType {
-    Alone,
-    Group,
-}
-
-impl Serialize for ShareType {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        match self {
-            ShareType::Alone => serializer.serialize_i64(0),
-            ShareType::Group => serializer.serialize_i64(1),
-        }
     }
 }
 
@@ -198,18 +173,6 @@ impl Serialize for TimeUsec {
 
         serializer.serialize_u64((epoch * 1000000.0) as u64)
     }
-}
-
-/// Response body for the /api/fetch endpoint.
-#[derive(Debug, Serialize)]
-pub struct FetchResponse {
-    #[serde(rename = "type")]
-    pub type_: ShareType, // Must be Group
-    pub expire: f64,
-    #[serde(rename = "serverTime")]
-    pub server_time: TimeUsec,
-    pub interval: u64,
-    pub points: HashMap<FetchId, Vec<Location>>,
 }
 
 #[derive(Debug, Serialize, Clone)]
