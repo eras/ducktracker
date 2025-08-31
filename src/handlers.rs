@@ -75,14 +75,16 @@ pub async fn create_session(
     // Calculate the expiration time.
     let expires_at = Utc::now() + Duration::seconds(data.duration as i64);
 
+    let tags_aux = models::TagsAux::from_share_id(&data.share_id);
+
     // Create a new session and store it in the DashMap.
     let new_session = Session {
         session_id: session_id.clone(),
         password_hash,
-        share_id: share_id.clone(),
         locations: Vec::new(),
         expires_at,
         fetch_id: state.generate_fetch_id(),
+        tags: tags_aux.into(),
     };
     state.sessions.insert(session_id.clone(), new_session);
 
@@ -133,9 +135,12 @@ async fn stream(
 ) -> impl Responder {
     info!("data: {}", data.tags);
     let state = state.lock().await;
-    let updates = state.updates.updates(&state).await;
+    let updates = state
+        .updates
+        .updates(&state, data.tags.0.iter().map(|x| x.clone()).collect())
+        .await;
     let events = futures_util::StreamExt::map(updates, |update| {
-        let update = update.expect("woot, there should have been an update..");
+        let (_update_context, update) = update.expect("woot, there should have been an update..");
         let json_data = serde_json::to_string(&update).expect("Failed to encode Update to JSON");
         Ok::<_, std::convert::Infallible>(actix_web_lab::sse::Event::Data(
             actix_web_lab::sse::Data::new(json_data),

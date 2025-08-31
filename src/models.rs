@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -22,10 +22,10 @@ pub struct Location {
 pub struct Session {
     pub session_id: SessionId,
     pub password_hash: String,
-    pub share_id: ShareId,
     pub locations: Vec<Location>,
     pub expires_at: DateTime<Utc>,
     pub fetch_id: FetchId,
+    pub tags: Tags,
 }
 
 // ========================
@@ -42,7 +42,7 @@ pub struct CreateRequest {
     #[serde(rename = "mod")]
     pub mode: u64, // Something?
     #[serde(rename = "lid")]
-    pub share_id: Option<String>, // Desired share id
+    pub share_id: Option<String>, // Desired share id; actually list of tags to publish to
     #[serde(rename = "dur")]
     pub duration: u64, // In seconds
     #[serde(rename = "int")]
@@ -136,6 +136,69 @@ pub struct ShareId(pub String);
 #[derive(Debug, Clone, Serialize, Deserialize, Hash, Eq, PartialEq)]
 pub struct Tag(pub String);
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Tags(pub HashSet<Tag>);
+
+#[derive(Debug, Clone, Hash, Eq, PartialEq)]
+pub enum TagVisibility {
+    Private,
+    Public,
+}
+
+pub struct TagsAux(pub HashSet<(Tag, TagVisibility)>);
+
+impl Into<Tags> for TagsAux {
+    fn into(self) -> Tags {
+        Tags(self.0.into_iter().map(|(x, _)| x).collect())
+    }
+}
+
+impl std::ops::BitAnd for &Tags {
+    type Output = Tags;
+
+    fn bitand(self, rhs: Self) -> Self::Output {
+        Tags(&self.0 & &rhs.0)
+    }
+}
+
+impl FromIterator<Tag> for Tags {
+    fn from_iter<T: IntoIterator<Item = Tag>>(iter: T) -> Self {
+        Tags(HashSet::from_iter(iter))
+    }
+}
+
+impl Tags {
+    pub fn new() -> Self {
+        Self(HashSet::new())
+    }
+
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+}
+
+impl TagsAux {
+    pub fn from_share_id(share_id: &Option<String>) -> Self {
+        match share_id {
+            None => TagsAux(HashSet::new()), // TODO: in this case, use some configurable default tag
+            Some(share_id) => {
+                let tags: HashSet<(Tag, TagVisibility)> = share_id
+                    .split(",")
+                    .map(|x| {
+                        let visibility = if x.starts_with("pub") {
+                            TagVisibility::Public
+                        } else {
+                            TagVisibility::Private
+                        };
+                        (Tag(x.to_string()), visibility)
+                    })
+                    .collect();
+                TagsAux(tags)
+            }
+        }
+    }
+}
+
 impl std::str::FromStr for Tag {
     type Err = ();
 
@@ -185,12 +248,20 @@ pub struct Update {
 
 #[derive(Debug, Serialize, Clone)]
 pub enum UpdateChange {
+    // Reset all client state
     #[serde(rename = "reset")]
     Reset,
+    #[serde(rename = "set_tags")]
+    AddTags {
+        // Only includes the tags the client has subscribed to
+        tags: HashMap<FetchId, Tags>,
+    },
     #[serde(rename = "add")]
     Add {
         points: HashMap<FetchId, Vec<Location>>,
     },
+    #[serde(rename = "expire_fetch")]
+    ExpireFetch { fetch_id: FetchId },
 }
 
 /// Request body for the /api/stream endpoint.
