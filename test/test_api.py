@@ -5,6 +5,52 @@ import requests
 import json
 import time
 import typing
+import sseclient
+import random
+import string
+
+from pydantic import BaseModel, RootModel
+from typing import Any, Literal, Generator
+
+
+def random_string() -> str:
+    return "".join(random.choices(string.ascii_letters + string.digits, k=4))
+
+
+class SetTagsTags(BaseModel):
+    tags: dict[str, Any]
+
+
+class SetTags(BaseModel):
+    set_tags: SetTagsTags
+
+
+class AddPoints(BaseModel):
+    points: dict[str, Any]
+
+
+class Add(BaseModel):
+    add: AddPoints
+
+
+Change = Literal["reset"] | SetTags | Add
+
+
+# Root model for the list of commands
+class ChangeList(RootModel[list[Change]]):
+    pass
+
+
+class Changes(BaseModel):
+    serverTime: int
+    interval: int
+    changes: ChangeList
+
+
+class StreamEvent(BaseModel):
+    serverTime: int
+    interval: int
+    changes: list[Change]
 
 
 class HaukApiTest(unittest.TestCase):
@@ -16,18 +62,31 @@ class HaukApiTest(unittest.TestCase):
         self.assertEqual(lines[0], "OK")
         return lines
 
+    def stream_sse(self, tags: list[str]) -> Generator[StreamEvent, None, None]:
+        headers = {"Accept": "text/event-stream"}
+        tags_str = ",".join(tags)
+        response = requests.get(
+            f"{self.BASE_URL}stream?tags={tags_str}", stream=True, headers=headers
+        )
+        client = sseclient.SSEClient(response)
+        return (
+            StreamEvent.model_validate_json(event.data) for event in client.events()
+        )
+
     def test_create_and_fetch_session(self) -> None:
         """Tests the session creation and basic data retrieval."""
         session_id: str = ""
         response: requests.Response
 
         try:
+            tag = f"test_create_and_fetch_session_{random_string()}"
+
             # Data for the new create.php endpoint
             create_data = {
                 "usr": "testuser",
                 "pwd": "testpassword",
                 "mod": 0,
-                "lid": "test_create_and_fetch_session",
+                "lid": tag,
                 "dur": 3600,
                 "int": 30,
             }
@@ -43,15 +102,11 @@ class HaukApiTest(unittest.TestCase):
             share_id = lines[3]
 
             # 2. Test fetch_location endpoint with the new session ID
-            response = requests.get(
-                f"{self.BASE_URL}fetch.php", params={"id": share_id}
-            )
-            self.assertEqual(response.status_code, 200)
-
-            # Fetch still returns JSON for data retrieval
-            data = response.json()
-            nick = list(data["points"].keys())[0]
-            self.assertEqual(len(data["points"][nick]), 0)  # No locations posted yet
+            stream_sse = self.stream_sse([tag])
+            first = next(stream_sse)
+            self.assertEqual(first.changes[0], "reset")
+            self.assertEqual(list(first.changes[1].set_tags.tags.values()), [[tag]])
+            self.assertEqual(list(first.changes[2].add.points.values()), [[]])
 
         except requests.exceptions.RequestException as e:
             self.fail(f"HTTP request failed: {e}")
@@ -59,19 +114,18 @@ class HaukApiTest(unittest.TestCase):
             self.fail(
                 f"Invalid text response from server. Response text: {response.text}"
             )
-        except Exception as e:
-            self.fail(f"An unexpected error occurred: {e}")
 
     def test_post_and_fetch_location(self) -> None:
         """Tests posting a location and fetching it."""
         session_id: str = ""
         try:
+            tag = f"test_post_and_fetch_location_{random_string()}"
             # Create a session first, using the new endpoint and parsing.
             create_data = {
                 "usr": "testuser",
                 "pwd": "testpassword",
                 "mod": 0,
-                "lid": "test_post_and_fetch_location",
+                "lid": tag,
                 "dur": 3600,
                 "int": 30,
             }
@@ -105,19 +159,13 @@ class HaukApiTest(unittest.TestCase):
             self.assertEqual(self.parse_response(response.text)[0], "OK")
 
             # 2. Test fetch_location to retrieve the posted data
-            response = requests.get(
-                f"{self.BASE_URL}fetch.php", params={"id": share_id}
-            )
-            self.assertEqual(response.status_code, 200)
-            data = response.json()
-            nick = list(data["points"].keys())[0]
-            self.assertGreater(
-                len(data["points"][nick]), 0, "Expected any data to present, none found"
-            )
-
-            first_location = data["points"][nick][0]
-            self.assertAlmostEqual(first_location[0], location_data["lat"])
-            self.assertAlmostEqual(first_location[1], location_data["lon"])
+            stream_sse = self.stream_sse([tag])
+            first = next(stream_sse)
+            self.assertEqual(first.changes[0], "reset")
+            self.assertEqual(list(first.changes[1].set_tags.tags.values()), [[tag]])
+            points = list(first.changes[2].add.points.values())
+            self.assertAlmostEqual(points[0][0][0], location_data["lat"])
+            self.assertAlmostEqual(points[0][0][1], location_data["lon"])
 
         except requests.exceptions.RequestException as e:
             self.fail(f"HTTP request failed: {e}")
