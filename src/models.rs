@@ -4,9 +4,11 @@ use crate::state;
 use chrono::{DateTime, Utc};
 use futures::stream::{self, StreamExt};
 use serde::{Deserialize, Serialize};
+use ts_rs::TS;
 
 /// Represents the current location data for a session.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, TS)]
+#[ts(as = "LocationTS")]
 pub struct Location {
     pub lat: f64,
     pub lon: f64,
@@ -18,6 +20,10 @@ pub struct Location {
     pub provider: u64, // location provider, seems to be 0 or 1, probably coarse vs fine
     pub time: f64,
 }
+
+#[derive(TS)]
+#[allow(dead_code)]
+struct LocationTS([f64; 6]);
 
 /// Represents a single tracking session. This data is stored in memory.
 #[derive(Debug, Clone)]
@@ -135,11 +141,54 @@ impl Serialize for Location {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, TS)]
+#[ts(as = "TimeUsecTS")]
 pub struct TimeUsec(pub std::time::SystemTime);
 
+#[derive(TS)]
+#[allow(dead_code)]
+struct TimeUsecTS(f64);
+
+//impl TS for TimeUse// c {
+//     type WithoutGenerics = Self;
+
+//     type OptionInnerType = Self;
+
+//     fn decl() -> String {
+//         "type TimeUsec = number".to_string()
+//     }
+
+//     fn decl_concrete() -> String {
+//         "type TimeUsec = number".to_string()
+//     }
+
+//     fn name() -> String {
+//         "TimeUsec".to_string()
+//     }
+
+//     fn inline() -> String {
+//         "number".to_string()
+//     }
+
+//     fn inline_flattened() -> String {
+//         "number".to_string()
+//     }
+// }
+
+// This doesn't work. Why? The expects fail.
+// #[cfg(test)]
+// mod tests {
+//     #[test]
+//     fn export_bindings_manual() {
+//         use ts_rs::TS;
+//         super::Location::export().expect("Failed to export type Location");
+//         super::TimeUsec::export().expect("Failed to export type TimeUsec");
+//     }
+// }
+
 // Given to each new publish session
-#[derive(Debug, Clone, Serialize, Deserialize, Hash, Eq, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, Hash, Eq, PartialEq, TS)]
+#[ts(export)]
 pub struct SessionId(pub String);
 
 impl std::fmt::Display for SessionId {
@@ -149,13 +198,16 @@ impl std::fmt::Display for SessionId {
 }
 
 // Useless?
-#[derive(Debug, Clone, Serialize, Deserialize, Hash, Eq, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, Hash, Eq, PartialEq, TS)]
+#[ts(export)]
 pub struct ShareId(pub String);
 
-#[derive(Debug, Clone, Serialize, Deserialize, Hash, Eq, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, Hash, Eq, PartialEq, TS)]
+#[ts(export)]
 pub struct Tag(pub String);
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
 pub struct Tags(pub HashSet<Tag>);
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
@@ -250,7 +302,8 @@ impl std::fmt::Display for ShareId {
 }
 
 // Id used when providing data back to clients
-#[derive(Debug, Copy, Clone, Serialize, Deserialize, Hash, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Serialize, Deserialize, Hash, Eq, PartialEq, TS)]
+#[ts(export)]
 pub struct FetchId(pub u64);
 
 impl Serialize for TimeUsec {
@@ -268,7 +321,8 @@ impl Serialize for TimeUsec {
     }
 }
 
-#[derive(Debug, Serialize, Clone)]
+#[derive(Debug, Serialize, Clone, TS)]
+#[ts(export)]
 pub struct Update {
     #[serde(rename = "serverTime")]
     pub server_time: TimeUsec,
@@ -294,7 +348,8 @@ impl Update {
     }
 }
 
-#[derive(Debug, Serialize, Clone)]
+#[derive(Debug, Serialize, Clone, TS)]
+#[ts(export)]
 pub enum UpdateChange {
     // Reset all client state
     #[serde(rename = "reset")]
