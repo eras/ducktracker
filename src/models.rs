@@ -68,6 +68,24 @@ impl CreateResponse {
     }
 }
 
+/// Request body for the /api/stop.php endpoint.
+#[derive(Debug, Deserialize)]
+pub struct StopRequest {
+    #[serde(rename = "sid")]
+    pub session_id: SessionId,
+    #[serde(rename = "lid")]
+    pub share_id: Option<String>,
+}
+
+#[derive(Debug)]
+pub struct StopResponse {}
+
+impl StopResponse {
+    pub fn to_client(&self) -> String {
+        return format!("OK\n",);
+    }
+}
+
 /// Request body for the /api/post endpoint.
 #[derive(Debug, Deserialize)]
 pub struct PostRequest {

@@ -44,6 +44,7 @@ async fn main() -> std::io::Result<()> {
             .wrap(cors)
             .app_data(web::Data::new(app_state.clone()))
             .service(handlers::create_session)
+            .service(handlers::stop_session)
             .service(handlers::post_location)
             .service(handlers::stream)
     })

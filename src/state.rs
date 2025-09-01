@@ -48,6 +48,23 @@ impl State {
         session_id
     }
 
+    pub async fn remove_session(&mut self, session_id: &models::SessionId) {
+        if let Some((_session_id, session)) = self.sessions.remove(session_id) {
+            let context = UpdateContext {
+                tags: session.tags.clone(),
+            };
+            let update = Update {
+                server_time: models::TimeUsec(std::time::SystemTime::now()),
+                interval: 0u64,
+                changes: [UpdateChange::ExpireFetch {
+                    fetch_id: session.fetch_id,
+                }]
+                .to_vec(),
+            };
+            self.updates.send_update(context, update);
+        }
+    }
+
     pub async fn add_tags(&mut self, fetch_id: models::FetchId, tags_aux: models::TagsAux) {
         for (tag, visibility) in tags_aux.0.iter() {
             if *visibility == models::TagVisibility::Public {
@@ -55,6 +72,7 @@ impl State {
             }
         }
 
+        let public_tags = tags_aux.public_tags();
         let tags: models::Tags = tags_aux.into();
 
         let context = UpdateContext { tags: tags.clone() };
@@ -65,7 +83,7 @@ impl State {
             interval: 0u64,
             changes: [UpdateChange::AddTags {
                 tags: new_tags,
-                public: models::Tags::new(),
+                public: public_tags,
             }]
             .to_vec(),
         };
@@ -175,7 +193,7 @@ impl Updates {
             .collect();
         changes.push(UpdateChange::AddTags {
             tags: fetch_tags,
-            public: models::Tags::new(),
+            public: state.public_tags.clone(),
         });
         changes.push(UpdateChange::Add { points });
         (

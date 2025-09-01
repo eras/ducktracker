@@ -80,6 +80,22 @@ pub async fn create_session(
         .body(response.to_client())
 }
 
+/// Handler for the `/api/create` endpoint.
+///
+/// This function creates a new tracking session and returns a share link.
+#[post("/api/stop.php")]
+pub async fn stop_session(
+    data: web::Form<models::StopRequest>,
+    state: web::Data<AppState>,
+) -> impl Responder {
+    let mut state = state.lock().await;
+    state.remove_session(&data.session_id).await;
+    let response = models::StopResponse {};
+    HttpResponse::Ok()
+        .content_type("text/plain")
+        .body(response.to_client())
+}
+
 /// Handler for the `/api/post` endpoint.
 ///
 /// This function updates the location data for an existing session.
