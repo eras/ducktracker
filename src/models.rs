@@ -426,5 +426,7 @@ impl UpdateChange {
 /// Request body for the /api/stream endpoint.
 #[derive(Debug, Deserialize)]
 pub struct StreamRequest {
+    // No tags -> use all public tags
+    #[serde(default = "crate::utils::CommaSeparatedVec::new")]
     pub tags: crate::utils::CommaSeparatedVec<Tag>,
 }

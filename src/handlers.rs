@@ -126,11 +126,15 @@ async fn stream(
     data: web::Query<models::StreamRequest>,
     app_state: web::Data<AppState>,
 ) -> impl Responder {
-    info!("data: {}", data.tags);
     let state = app_state.lock().await;
+    let tags = if data.tags.0.len() == 0 {
+        state.get_public_tags().0.clone()
+    } else {
+        data.tags.0.iter().map(|x| x.clone()).collect()
+    };
     let updates = state
         .updates
-        .updates(&state, data.tags.0.iter().map(|x| x.clone()).collect())
+        .updates(&state, tags.iter().map(|x| x.clone()).collect())
         .await;
     let events = futures_util::StreamExt::map(updates, |update| {
         let (_update_context, update) = update.expect("woot, there should have been an update..");

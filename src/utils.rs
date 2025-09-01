@@ -3,6 +3,12 @@ use serde::Deserialize;
 #[derive(Debug)]
 pub struct CommaSeparatedVec<T>(pub Vec<T>);
 
+impl<T> CommaSeparatedVec<T> {
+    pub fn new() -> Self {
+        CommaSeparatedVec(Vec::new())
+    }
+}
+
 impl<'de, T> Deserialize<'de> for CommaSeparatedVec<T>
 where
     T: Clone + std::str::FromStr + std::fmt::Display,

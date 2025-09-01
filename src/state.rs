@@ -26,6 +26,10 @@ impl State {
         }
     }
 
+    pub fn get_public_tags(&self) -> models::Tags {
+        self.public_tags.clone()
+    }
+
     pub async fn add_session(
         &mut self,
         expires_at: chrono::DateTime<Utc>,
