@@ -1,5 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
+use crate::state;
 use chrono::{DateTime, Utc};
 use futures::stream::{self, StreamExt};
 use serde::{Deserialize, Serialize};
@@ -261,10 +262,10 @@ impl Update {
     pub async fn filter_map(
         self,
         filter_tags: &Tags,
-        fetch_id_tag_map_accessor: &crate::state::FetchIdTagsMapAccessor,
+        update_context: &state::UpdateContext,
     ) -> Option<Update> {
         let changes: Vec<_> = stream::iter(self.changes)
-            .filter_map(|x| x.filter_map(filter_tags, fetch_id_tag_map_accessor))
+            .filter_map(|x| x.filter_map(filter_tags, update_context))
             .collect()
             .await;
         if changes.len() > 0 {
@@ -302,7 +303,7 @@ impl UpdateChange {
     async fn filter_map(
         self,
         filter_tags: &Tags,
-        fetch_id_tag_map_accessor: &crate::state::FetchIdTagsMapAccessor,
+        update_context: &state::UpdateContext,
     ) -> Option<UpdateChange> {
         match self {
             Self::Reset => Some(self.clone()),
@@ -326,8 +327,7 @@ impl UpdateChange {
             Self::Add { points } => {
                 let points = stream::iter(points)
                     .filter_map(|(fetch_id, locations)| async move {
-                        let shared_tags =
-                            &fetch_id_tag_map_accessor.get(&fetch_id).await & filter_tags;
+                        let shared_tags = &update_context.tags & filter_tags;
                         if shared_tags.len() > 0 {
                             Some((fetch_id, locations))
                         } else {
@@ -339,7 +339,7 @@ impl UpdateChange {
                 Some(UpdateChange::Add { points })
             }
             Self::ExpireFetch { fetch_id } => {
-                let shared_tags = &fetch_id_tag_map_accessor.get(&fetch_id).await & filter_tags;
+                let shared_tags = &update_context.tags & filter_tags;
                 if shared_tags.len() > 0 {
                     Some(UpdateChange::ExpireFetch { fetch_id })
                 } else {

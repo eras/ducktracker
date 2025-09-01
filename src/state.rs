@@ -8,27 +8,12 @@ pub enum Error {
     SessionExpired,
 }
 
-pub type FetchIdTagsMap = HashMap<models::FetchId, models::Tags>;
-
 pub struct State {
     pub sessions: dashmap::DashMap<models::SessionId, models::Session>,
     pub updates: Updates,
-    fetch_id_tags_map: Arc<RwLock<FetchIdTagsMap>>,
     public_tags: models::Tags,
 
     next_fetch_id: models::FetchId,
-}
-
-#[derive(Clone)]
-pub struct FetchIdTagsMapAccessor {
-    fetch_id_tags_map: Arc<RwLock<FetchIdTagsMap>>,
-}
-
-impl FetchIdTagsMapAccessor {
-    pub async fn get(&self, fetch_id: &models::FetchId) -> models::Tags {
-	let fetch_id_tags_map = self.fetch_id_tags_map.read().await;
-	fetch_id_tags_map.get(fetch_id).unwrap_or(&models::Tags::new()).clone()
-    }
 }
 
 impl State {
@@ -38,7 +23,6 @@ impl State {
             sessions: dashmap::DashMap::new(),
             next_fetch_id: models::FetchId(0u64),
             public_tags: models::Tags::new(),
-            fetch_id_tags_map: Arc::new(RwLock::new(FetchIdTagsMap::new())),
         }
     }
 
@@ -64,12 +48,6 @@ impl State {
         session_id
     }
 
-    pub fn make_fetch_id_tag_map_accessor(&self) -> FetchIdTagsMapAccessor {
-        FetchIdTagsMapAccessor {
-            fetch_id_tags_map: self.fetch_id_tags_map.clone(),
-        }
-    }
-
     pub async fn add_tags(&mut self, fetch_id: models::FetchId, tags_aux: models::TagsAux) {
         for (tag, visibility) in tags_aux.0.iter() {
             if *visibility == models::TagVisibility::Public {
@@ -78,11 +56,6 @@ impl State {
         }
 
         let tags: models::Tags = tags_aux.into();
-
-        {
-            let mut fetch_id_tags_map = self.fetch_id_tags_map.write().await;
-            fetch_id_tags_map.insert(fetch_id.clone(), tags.clone());
-        }
 
         let context = UpdateContext { tags: tags.clone() };
         let mut new_tags = HashMap::new();
@@ -158,6 +131,9 @@ pub struct Updates {
 pub type UpdateBroadcast =
     Result<(UpdateContext, Update), tokio_stream::wrappers::errors::BroadcastStreamRecvError>;
 
+// Used to share the context when a particular update was created.
+// E.g. in case of AddPoints it is not known which tags are relevant to a fetch_id,
+// so we can get this information from there
 #[derive(Debug, Clone)]
 pub struct UpdateContext {
     pub tags: models::Tags,
@@ -223,21 +199,18 @@ impl Updates {
         let first_stream =
             futures_util::stream::once(async move { UpdateBroadcast::Ok(initial_message) });
 
-        let fetch_id_tag_map_accessor = state.make_fetch_id_tag_map_accessor();
-
         // Filter our messages this subscription doesn't see
         // Modify tags so that the client doesn't learn about new tags
         let updates = {
             futures_util::StreamExt::filter_map(updates, move |x| {
                 let filter_tags = tags.clone();
-                let fetch_id_tag_map_accessor = fetch_id_tag_map_accessor.clone();
                 async move {
                     match x {
                         Ok((context, update)) => {
                             let shared_tags = &context.tags & &filter_tags;
                             if shared_tags.len() > 0 {
                                 let shared_context = UpdateContext { tags: shared_tags };
-                                match update.filter_map(&filter_tags, &fetch_id_tag_map_accessor).await {
+                                match update.filter_map(&filter_tags, &context).await {
                                     None => None,
                                     Some(update) => Some(Ok((shared_context, update))),
                                 }
