@@ -10,7 +10,7 @@ import random
 import string
 
 from pydantic import BaseModel, RootModel
-from typing import Any, Literal, Generator
+from typing import Any, Literal, Generator, TypeAlias
 
 
 def random_string() -> str:
@@ -18,37 +18,32 @@ def random_string() -> str:
 
 
 class AddTagsTags(BaseModel):
-    tags: dict[str, Any]
+    tags: dict[str, list[str]]  # Set of tags (in general) published by a fetch_id
+    public: set[str]  # Public tags published by a fetch_id
 
 
 class AddTags(BaseModel):
-    add_tags: AddTagsTags
+    add_tags: AddTagsTags  # tags added by this add tags update
+
+
+# lat, lon, time (epoch in micros), speed, accuracy, GPS source (0 or 1)
+Point: TypeAlias = tuple[float, float, float, float | None, float | None, float]
 
 
 class AddPoints(BaseModel):
-    points: dict[str, Any]
+    points: dict[str, list[Point]]  # points added by this add points update
 
 
 class Add(BaseModel):
-    add: AddPoints
+    add: AddPoints  # Add update
 
 
 class ExpireFetch(BaseModel):
-    fetch_id: str
+    fetch_id: str  # Fetch_id expired
 
 
+# Reset = Remove everything in client
 Change = Literal["reset"] | AddTags | Add | ExpireFetch
-
-
-# Root model for the list of commands
-class ChangeList(RootModel[list[Change]]):
-    pass
-
-
-class Changes(BaseModel):
-    serverTime: int
-    interval: int
-    changes: ChangeList
 
 
 class StreamEvent(BaseModel):
