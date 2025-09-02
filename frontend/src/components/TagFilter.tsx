@@ -23,9 +23,9 @@ const TagFilter: React.FC = () => {
   return (
     <div className="p-4 bg-white shadow-lg rounded-xl m-4 absolute top-0 left-0 z-10 flex flex-col gap-4 backdrop-blur-sm bg-white/70">
       <div className="flex flex-wrap gap-2">
-        {tags.length > 0 ? (
-          tags.map((tag) => {
-            const isCustom = customTags.includes(tag);
+        {tags.size > 0 ? (
+          [...tags].map((tag) => {
+            const isCustom = customTags.has(tag);
             return (
               <div key={tag} className="relative group">
                 <button

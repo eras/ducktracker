@@ -1,12 +1,13 @@
 import { create } from "zustand";
 import { useProtocolStore } from "../lib/protocol";
 import { Fetches } from "../lib/types";
+import { difference, union } from "../lib/set";
 
 interface AppState {
   selectedTags: Set<string>;
   fetches: Fetches;
-  tags: string[];
-  customTags: string[];
+  tags: Set<string>;
+  customTags: Set<string>;
   toggleTag: (tag: string) => void;
   addCustomTag: (tag: string) => void;
   removeCustomTag: (tag: string) => void;
@@ -15,19 +16,19 @@ interface AppState {
 const CUSTOM_TAGS_KEY = "customTags";
 
 // Helper function for localStorage
-const getStoredTags = (): string[] => {
+const getStoredTags = (): Set<string> => {
   try {
     const stored = localStorage.getItem(CUSTOM_TAGS_KEY);
-    return stored ? JSON.parse(stored) : [];
+    return stored ? new Set(JSON.parse(stored)) : new Set<string>();
   } catch (e) {
     console.error("Failed to load custom tags from localStorage", e);
-    return [];
+    return new Set();
   }
 };
 
-const saveTagsToStorage = (tags: string[]) => {
+const saveTagsToStorage = (tags: Set<string>) => {
   try {
-    localStorage.setItem(CUSTOM_TAGS_KEY, JSON.stringify(tags));
+    localStorage.setItem(CUSTOM_TAGS_KEY, JSON.stringify([...tags]));
   } catch (e) {
     console.error("Failed to save custom tags to localStorage", e);
   }
@@ -36,7 +37,7 @@ const saveTagsToStorage = (tags: string[]) => {
 export const useAppStore = create<AppState>((set) => ({
   selectedTags: new Set<string>(),
   fetches: {},
-  tags: [],
+  tags: new Set<string>(),
   customTags: getStoredTags(),
 
   toggleTag: (tag: string) =>
@@ -53,17 +54,17 @@ export const useAppStore = create<AppState>((set) => ({
   addCustomTag: (tag: string) =>
     set((state) => {
       const trimmedTag = tag.trim().toLowerCase();
-      if (!trimmedTag || state.customTags.includes(trimmedTag)) {
+      if (!trimmedTag || state.customTags.has(trimmedTag)) {
         return {}; // Do nothing if tag is empty or already exists
       }
-      const newCustomTags = [...state.customTags, trimmedTag];
+      const newCustomTags = new Set([...state.customTags, trimmedTag]);
       saveTagsToStorage(newCustomTags);
       return { customTags: newCustomTags };
     }),
 
   removeCustomTag: (tag: string) =>
     set((state) => {
-      const newCustomTags = state.customTags.filter((t) => t !== tag);
+      const newCustomTags = difference(state.customTags, new Set([tag]));
       saveTagsToStorage(newCustomTags);
       return { customTags: newCustomTags };
     }),
@@ -71,13 +72,13 @@ export const useAppStore = create<AppState>((set) => ({
 
 // Subscribe to the protocol store and merge with custom tags
 useProtocolStore.subscribe((protocolState) => {
-  const combinedTags = new Set([
-    ...protocolState.tags,
-    ...useAppStore.getState().customTags,
-  ]);
+  const combinedTags = union(
+    protocolState.tags,
+    useAppStore.getState().customTags,
+  );
   useAppStore.setState({
     fetches: protocolState.fetches,
-    tags: Array.from(combinedTags),
+    tags: combinedTags,
   });
 });
 
@@ -87,9 +88,9 @@ useAppStore.subscribe((state, prevState) => {
   // Only update if the custom tags have actually changed
   if (state.customTags !== prevState.customTags) {
     const protocolTags = useProtocolStore.getState().tags;
-    const combinedTags = new Set([...protocolTags, ...state.customTags]);
+    const combinedTags = union(protocolTags, state.customTags);
     useAppStore.setState({
-      tags: Array.from(combinedTags),
+      tags: combinedTags,
     });
   }
 });
