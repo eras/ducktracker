@@ -60,7 +60,8 @@ let processUpdates = (
           }
         });
       } else if ("expire_fetch" in change) {
-        //const expire_fetch = change.expire_fetch;
+        let fetch_index = change.expire_fetch.fetch_id;
+        delete state.fetches[fetch_index];
       } else {
         console.error("Unknown update:", change);
         break;
