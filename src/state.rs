@@ -21,7 +21,7 @@ impl State {
         Self {
             updates,
             sessions: dashmap::DashMap::new(),
-            next_fetch_id: models::FetchId(0u64),
+            next_fetch_id: models::FetchId::default(),
             public_tags: models::Tags::new(),
         }
     }

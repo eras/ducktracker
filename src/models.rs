@@ -302,9 +302,9 @@ impl std::fmt::Display for ShareId {
 }
 
 // Id used when providing data back to clients
-#[derive(Debug, Copy, Clone, Serialize, Deserialize, Hash, Eq, PartialEq, TS)]
+#[derive(Debug, Copy, Clone, Serialize, Deserialize, Hash, Eq, PartialEq, TS, Default)]
 #[ts(export)]
-pub struct FetchId(pub u64);
+pub struct FetchId(pub u32);
 
 impl Serialize for TimeUsec {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
