@@ -3,12 +3,16 @@ import { Tag } from "../bindings/Tag";
 import { Update } from "../bindings/Update";
 import { UpdateChange } from "../bindings/UpdateChange";
 import { Fetches, parseLocation } from "./types";
+import { union } from "../lib/set";
 
 export interface ProtocolState {
   fetches: Fetches;
   tags: Set<Tag>;
   publicTags: Set<Tag>;
-  connect: (tags: string[]) => EventSource;
+  connect: (
+    tags: string[],
+    addTags: (tags: Set<string>) => void,
+  ) => EventSource;
   disconnect: (eventSource: EventSource) => void;
 }
 
@@ -17,6 +21,7 @@ const API_URL = "/api";
 let processUpdates = (
   updates: Array<UpdateChange>,
   stateIn: ProtocolState,
+  addTags: (tags: Set<string>) => void,
 ): {
   fetches: Fetches;
   tags: Set<Tag>;
@@ -36,6 +41,7 @@ let processUpdates = (
       };
     } else {
       if ("add_tags" in change) {
+        let new_tags = new Set([...change.add_tags.public]);
         Object.entries(change.add_tags.tags).forEach(([fetch_id, tags]) => {
           if (tags) {
             let fetch_index = parseInt(fetch_id);
@@ -43,7 +49,10 @@ let processUpdates = (
               fetch_index in state.fetches
                 ? state.fetches[fetch_index]
                 : { locations: [], tags: new Set<string>() };
-            fetch.tags = new Set([...fetch.tags, ...tags]);
+            fetch.tags = union(fetch.tags, tags);
+            for (const tag of tags) {
+              new_tags.add(tag);
+            }
             state.fetches[fetch_index] = fetch;
           }
         });
@@ -51,6 +60,7 @@ let processUpdates = (
           ...state.publicTags,
           ...change.add_tags.public,
         ]);
+        addTags(new_tags);
       } else if ("add" in change) {
         Object.entries(change.add.points).forEach(([fetch_id, points]) => {
           if (points) {
@@ -80,7 +90,7 @@ export const useProtocolStore = create<ProtocolState>((set) => ({
   tags: new Set<Tag>(),
   publicTags: new Set<Tag>(),
 
-  connect: (tags: string[]) => {
+  connect: (tags: string[], addTags: (tags: Set<string>) => void) => {
     const tagsQuery = tags.length > 0 ? `tags=${tags.join(",")}` : "";
     const url = `${API_URL}/stream?${tagsQuery}`;
 
@@ -90,7 +100,7 @@ export const useProtocolStore = create<ProtocolState>((set) => ({
       try {
         const data: Update = JSON.parse(event.data);
         console.log(`Processing ${JSON.stringify(data)}`);
-        set((state) => processUpdates(data.changes, state));
+        set((state) => processUpdates(data.changes, state, addTags));
       } catch (e) {
         console.error("Failed to parse SSE message:", e);
       }

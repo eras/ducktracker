@@ -17,7 +17,11 @@ const App: React.FC = () => {
     }
 
     const tagsArray = Array.from(selectedTags);
-    const newEventSource = connect(tagsArray);
+    const newEventSource = connect(
+      tagsArray,
+      useAppStore.getState().addTags,
+      // useAppStore((state) => state.addTags(tags)),
+    );
     eventSourceRef.current = newEventSource;
 
     return () => {

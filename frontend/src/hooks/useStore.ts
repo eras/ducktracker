@@ -8,6 +8,7 @@ interface AppState {
   fetches: Fetches;
   tags: Set<string>;
   customTags: Set<string>;
+  addTags: (tags: Set<string>) => void;
   toggleTag: (tag: string) => void;
   addCustomTag: (tag: string) => void;
   removeCustomTag: (tag: string) => void;
@@ -51,6 +52,17 @@ export const useAppStore = create<AppState>((set) => ({
       return { selectedTags: newTags };
     }),
 
+  addTags: (tags: Set<string>) =>
+    set((state) => {
+      const newTags = union(state.tags, tags);
+      if (difference(newTags, state.tags).size == 0) {
+        return {};
+      } else {
+        console.log(`New selected tag: ${[...newTags]}`);
+        return { tags: newTags, customTags: newTags };
+      }
+    }),
+
   addCustomTag: (tag: string) =>
     set((state) => {
       const trimmedTag = tag.trim().toLowerCase();
@@ -58,8 +70,9 @@ export const useAppStore = create<AppState>((set) => ({
         return {}; // Do nothing if tag is empty or already exists
       }
       const newCustomTags = new Set([...state.customTags, trimmedTag]);
+      const newSelectedTags = new Set([...state.selectedTags, trimmedTag]);
       saveTagsToStorage(newCustomTags);
-      return { customTags: newCustomTags };
+      return { customTags: newCustomTags, selectedTags: newSelectedTags };
     }),
 
   removeCustomTag: (tag: string) =>
