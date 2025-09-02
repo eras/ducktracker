@@ -1,28 +1,28 @@
-/**
- * Defines the structure for a single location point.
- * [longitude, latitude, ...other_data]
- */
-export type LocationPoint = [number, number, ...any[]];
+import { Tag } from "../bindings/Tag";
+import { FetchId } from "../bindings/FetchId";
+import { Location } from "../bindings/Location";
 
-/**
- * Defines the data structure for a single tracked object, including its tags and location points.
- */
-export interface TrackedObject {
-  t: string[];
-  p: LocationPoint[];
+export interface ParsedLocation {
+  latlon: [number, number];
+  accuracy?: number;
+  speed?: number;
+  provider: number;
+  time: number;
 }
 
-/**
- * The full data structure received from the server, mapping object IDs to their location data.
- */
-export interface LocationData {
-  [id: string]: TrackedObject;
+export let parseLocation = (location: Location): ParsedLocation => {
+  return {
+    latlon: [location[0], location[1]],
+    time: location[2],
+    speed: location[3],
+    accuracy: location[4],
+    provider: location[5],
+  };
+};
+
+export interface Fetch {
+  locations: Array<ParsedLocation>;
+  tags: Set<Tag>;
 }
 
-/**
- * The expected structure of a server-sent event message.
- */
-export interface ServerMessage {
-  tags: string[];
-  locations: LocationData;
-}
+export type Fetches = { [key in FetchId]: Fetch };

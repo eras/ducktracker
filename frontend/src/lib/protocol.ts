@@ -1,69 +1,109 @@
 import { create } from "zustand";
-import { LocationData, ServerMessage } from "./types";
+import { Tag } from "../bindings/Tag";
+import { Update } from "../bindings/Update";
+import { UpdateChange } from "../bindings/UpdateChange";
+import { Fetches, parseLocation } from "./types";
 
 export interface ProtocolState {
-  locations: LocationData;
-  tags: string[];
-  fetchData: () => void;
+  fetches: Fetches;
+  tags: Set<Tag>;
+  publicTags: Set<Tag>;
+  connect: (tags: string[]) => EventSource;
+  disconnect: (eventSource: EventSource) => void;
 }
 
+const API_URL = "/api";
+
+let processUpdates = (
+  updates: Array<UpdateChange>,
+  stateIn: ProtocolState,
+): {
+  fetches: Fetches;
+  tags: Set<Tag>;
+  publicTags: Set<Tag>;
+} => {
+  let state = {
+    fetches: { ...stateIn.fetches },
+    tags: new Set([...stateIn.tags]),
+    publicTags: new Set([...stateIn.publicTags]),
+  };
+  for (const change of updates) {
+    if (change == "reset") {
+      state = {
+        fetches: {},
+        tags: new Set(),
+        publicTags: new Set(),
+      };
+    } else {
+      if ("add_tags" in change) {
+        Object.entries(change.add_tags.tags).forEach(([fetch_id, tags]) => {
+          if (tags) {
+            let fetch_index = parseInt(fetch_id);
+            let fetch =
+              fetch_index in state.fetches
+                ? state.fetches[fetch_index]
+                : { locations: [], tags: new Set<string>() };
+            fetch.tags = new Set([...fetch.tags, ...tags]);
+            state.fetches[fetch_index] = fetch;
+          }
+        });
+        state.publicTags = new Set([
+          ...state.publicTags,
+          ...change.add_tags.public,
+        ]);
+      } else if ("add" in change) {
+        Object.entries(change.add.points).forEach(([fetch_id, points]) => {
+          if (points) {
+            let fetch = state.fetches[parseInt(fetch_id)];
+            const parsedPoints = points.map(parseLocation);
+            fetch.locations = [...fetch.locations, ...parsedPoints];
+          }
+        });
+      } else if ("expire_fetch" in change) {
+        //const expire_fetch = change.expire_fetch;
+      } else {
+        console.error("Unknown update:", change);
+        break;
+      }
+    }
+  }
+  return state;
+};
+
 /**
- * This is a stub implementation of the protocol. It simulates
- * an SSE connection by providing initial data and then
- * a partial update after a delay. In a real application,
- * this would connect to the actual SSE endpoint.
+ * Manages the Server-Sent Events (SSE) connection to the API.
+ * This is a real implementation that connects to the /api/stream endpoint.
  */
 export const useProtocolStore = create<ProtocolState>((set) => ({
-  locations: {},
-  tags: [],
+  fetches: {},
+  tags: new Set<Tag>(),
+  publicTags: new Set<Tag>(),
 
-  fetchData: () => {
-    // Initial data load simulation
-    const initialData: ServerMessage = {
-      tags: ["food", "home", "work"],
-      locations: {
-        "1": {
-          t: ["food", "alone"],
-          p: [
-            [59.436962, 24.753574],
-            [59.4369621, 24.7535741],
-          ],
-        },
-        "42": {
-          t: ["work", "group"],
-          p: [
-            [59.446962, 24.743574],
-            [59.4469621, 24.7435741],
-          ],
-        },
-      },
+  connect: (tags: string[]) => {
+    const tagsQuery = tags.length > 0 ? `tags=${tags.join(",")}` : "";
+    const url = `${API_URL}/stream?${tagsQuery}`;
+
+    const eventSource = new EventSource(url);
+
+    eventSource.onmessage = (event) => {
+      try {
+        const data: Update = JSON.parse(event.data);
+        console.log(`Processing ${JSON.stringify(data)}`);
+        set((state) => processUpdates(data.changes, state));
+      } catch (e) {
+        console.error("Failed to parse SSE message:", e);
+      }
     };
 
-    set({ locations: initialData.locations, tags: initialData.tags });
+    eventSource.onerror = (error) => {
+      console.error("EventSource failed:", error);
+      eventSource.close();
+    };
 
-    // Simulate a partial update over SSE after a delay
-    setTimeout(() => {
-      const partialUpdate: LocationData = {
-        "1": {
-          t: ["food", "alone"],
-          p: [
-            ...initialData.locations["1"].p,
-            [59.446962, 24.743574],
-            [59.4469621, 24.7435741],
-          ],
-        },
-        "99": {
-          t: ["home"],
-          p: [
-            [59.445962, 24.745574],
-            [59.4459621, 24.7455741],
-          ],
-        },
-      };
+    return eventSource;
+  },
 
-      set((state) => ({
-        locations: { ...state.locations, ...partialUpdate },
-      }));
-    }, 2000); // Simulate update after 2 seconds
+  disconnect: (eventSource: EventSource) => {
+    eventSource.close();
   },
 }));

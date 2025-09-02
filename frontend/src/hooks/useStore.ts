@@ -1,10 +1,10 @@
 import { create } from "zustand";
 import { useProtocolStore } from "../lib/protocol";
-import { LocationData } from "../lib/types";
+import { Fetches } from "../lib/types";
 
 interface AppState {
   selectedTags: Set<string>;
-  locations: LocationData;
+  fetches: Fetches;
   tags: string[];
   customTags: string[];
   toggleTag: (tag: string) => void;
@@ -35,7 +35,7 @@ const saveTagsToStorage = (tags: string[]) => {
 
 export const useAppStore = create<AppState>((set) => ({
   selectedTags: new Set<string>(),
-  locations: {},
+  fetches: {},
   tags: [],
   customTags: getStoredTags(),
 
@@ -76,7 +76,7 @@ useProtocolStore.subscribe((protocolState) => {
     ...useAppStore.getState().customTags,
   ]);
   useAppStore.setState({
-    locations: protocolState.locations,
+    fetches: protocolState.fetches,
     tags: Array.from(combinedTags),
   });
 });

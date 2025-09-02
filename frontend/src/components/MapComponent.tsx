@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from "react";
 import { useAppStore } from "../hooks/useStore";
+import { intersection } from "../lib/set";
 import "leaflet";
 
 // Use a global L from the script tag
@@ -11,7 +12,7 @@ const MapComponent: React.FC = () => {
   const markersRef = useRef<L.LayerGroup | null>(null);
   const polylinesRef = useRef<L.LayerGroup | null>(null); // Reference for the trace lines
   const isFirstUpdateRef = useRef(true);
-  const { locations, selectedTags } = useAppStore();
+  const { fetches, selectedTags } = useAppStore();
 
   // Initialize the map (runs only once)
   useEffect(() => {
@@ -53,14 +54,14 @@ const MapComponent: React.FC = () => {
     polylinesRef.current.clearLayers();
 
     // Add new markers and polylines based on filtered data
-    Object.values(locations).forEach((trace) => {
-      const hasSelectedTag = trace.t.some((tag) => selectedTags.has(tag));
+    Object.entries(fetches).forEach(([_fetch_id, fetch]) => {
+      const hasSelectedTag = intersection(fetch.tags, selectedTags).size !== 0;
       const isFiltered = selectedTags.size > 0 && !hasSelectedTag;
 
       if (!isFiltered) {
         // Use [lon, lat] order as requested
-        const points = trace.p.map(
-          (point) => [point[0], point[1]] as L.LatLngTuple,
+        const points = fetch.locations.map(
+          (loc) => loc.latlon as L.LatLngTuple,
         );
 
         // Render polyline
@@ -68,9 +69,9 @@ const MapComponent: React.FC = () => {
         polylinesRef.current?.addLayer(polyline);
 
         // Render markers
-        trace.p.forEach((point) => {
-          // Use [lon, lat] order as requested
-          const marker = L.circleMarker([point[0], point[1]], {
+        if (fetch.locations.length) {
+          const loc = fetch.locations[fetch.locations.length - 1];
+          const marker = L.circleMarker(loc.latlon, {
             radius: 6,
             fillColor: "#0078A8",
             color: "#fff",
@@ -78,20 +79,20 @@ const MapComponent: React.FC = () => {
             opacity: 1,
             fillOpacity: 0.8,
           });
-          marker.bindTooltip(`${trace.t.join(", ")}`);
+          marker.bindTooltip(`${[...fetch.tags].join(", ")}`);
           markersRef.current?.addLayer(marker);
-        });
+        }
       }
     });
 
-    const allPoints = Object.values(locations).flatMap((trace) => trace.p);
-    if (allPoints.length > 0 && mapRef.current && isFirstUpdateRef.current) {
+    const allLocs = Object.values(fetches).flatMap((trace) => trace.locations);
+    if (allLocs.length > 0 && mapRef.current && isFirstUpdateRef.current) {
       // Use [lon, lat] order as requested
-      const bounds = L.latLngBounds(allPoints.map((p) => [p[0], p[1]]));
+      const bounds = L.latLngBounds(allLocs.map((p) => p.latlon));
       mapRef.current.fitBounds(bounds, { padding: [50, 50], animate: false });
       isFirstUpdateRef.current = false;
     }
-  }, [locations, selectedTags]);
+  }, [fetches, selectedTags]);
 
   return <div ref={mapContainerRef} className="w-full h-full z-0" />;
 };
