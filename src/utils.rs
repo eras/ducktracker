@@ -1,3 +1,4 @@
+use rand::{Rng, distributions::Alphanumeric, thread_rng};
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::fs::File;
@@ -93,4 +94,11 @@ pub fn read_colon_separated_file<P: AsRef<Path>>(path: P) -> io::Result<HashMap<
 
     Ok(map)
 }
->>>>>>> 3f9e460 (fixup! backend: added authentication)
+
+pub fn generate_id() -> String {
+    rand::thread_rng()
+        .sample_iter(&Alphanumeric)
+        .take(16)
+        .map(char::from)
+        .collect()
+}

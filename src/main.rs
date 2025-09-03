@@ -47,6 +47,7 @@ async fn main() -> std::io::Result<()> {
             .service(handlers::stop_session)
             .service(handlers::post_location)
             .service(handlers::stream)
+            .service(handlers::login)
     })
     .bind(("0.0.0.0", 8080))?
     .run()

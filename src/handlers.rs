@@ -2,31 +2,19 @@ use std::collections::HashMap;
 
 use crate::AppState;
 use crate::models::{
-    self, CreateRequest, CreateResponse, Location, PostRequest, PostResponse, Session, TimeUsec,
+    self, CreateRequest, CreateResponse, Location, LoginResponse, PostRequest, PostResponse,
+    Session, TimeUsec,
 };
 use crate::state;
+use crate::utils;
 use actix_web::{HttpResponse, Responder, get, post, web};
 use actix_web_httpauth::extractors::basic::BasicAuth;
 use actix_web_httpauth::extractors::basic::Config as BasicAuthConfig;
 use chrono::{Duration, Utc};
 use hex;
 use log::info;
-use rand::{Rng, distributions::Alphanumeric, thread_rng};
 use sha2::{Digest, Sha256};
 use tokio_stream::StreamExt; // For stream combinators like .next()
-
-// Helper function for authentication
-fn authenticate_user(user: &str, password: &str, state: &crate::State) -> bool {
-    state.users.get(user).map_or(false, |p| p == password)
-}
-
-pub fn generate_id() -> String {
-    rand::thread_rng()
-        .sample_iter(&Alphanumeric)
-        .take(16)
-        .map(char::from)
-        .collect()
-}
 
 /// Handler for the `/api/create` endpoint.
 ///
@@ -38,10 +26,9 @@ pub async fn create_session(
 ) -> impl Responder {
     let mut state = state.lock().await;
 
-    if !authenticate_user(
+    if !state.authenticate(
         &data.user.clone().unwrap_or("".to_string()),
         &data.password.clone().unwrap_or("".to_string()),
-        &state,
     ) {
         return HttpResponse::Unauthorized().finish();
     }
@@ -57,7 +44,7 @@ pub async fn create_session(
     let share_id = models::ShareId(
         data.share_id
             .clone()
-            .unwrap_or_else(|| crate::handlers::generate_id()),
+            .unwrap_or_else(|| utils::generate_id()),
     );
     let share_link = format!("http://127.0.0.1/{share_id}");
 
@@ -117,14 +104,27 @@ pub async fn post_location(
     }
 }
 
+#[actix_web::post("/api/login")]
+pub async fn login(
+    data: web::Json<models::LoginRequest>,
+    app_state: web::Data<AppState>,
+) -> actix_web::Result<impl Responder> {
+    let mut state = app_state.lock().await;
+
+    if let Some(token) = state.create_token(&data.username, &data.password) {
+        Ok(web::Json(LoginResponse { token }))
+    } else {
+        Err(actix_web::error::ErrorUnauthorized("Invalid credentials."))
+    }
+}
+
 #[actix_web::get("/api/stream")]
-async fn stream(
-    auth: BasicAuth,
+pub async fn stream(
     data: web::Query<models::StreamRequest>,
     app_state: web::Data<AppState>,
 ) -> actix_web::Result<impl Responder> {
     let state = app_state.lock().await;
-    if !authenticate_user(auth.user_id(), auth.password().unwrap_or_default(), &state) {
+    if !state.check_token(&data.token) {
         //return HttpResponse::Unauthorized().body("Invalid credentials.");
         return Err(actix_web::error::ErrorUnauthorized("Invalid credentials."));
     }

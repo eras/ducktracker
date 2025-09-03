@@ -1,5 +1,7 @@
 use crate::models::{self, Location, Update, UpdateChange};
+use crate::utils;
 use chrono::Utc;
+use std::collections::HashSet;
 use std::{collections::HashMap, pin::Pin, sync::Arc};
 use tokio::sync::{RwLock, broadcast};
 
@@ -16,6 +18,7 @@ pub struct State {
     next_fetch_id: models::FetchId,
 
     pub users: HashMap<String, String>, // Key: username, Value:  password (should be hashed)
+    pub tokens: HashSet<String>,
 }
 
 impl State {
@@ -29,7 +32,26 @@ impl State {
             next_fetch_id: models::FetchId::default(),
             public_tags: models::Tags::new(),
             users,
+            tokens: HashSet::new(),
         }
+    }
+
+    pub fn authenticate(&self, user: &str, password: &str) -> bool {
+        self.users.get(user).map_or(false, |p| p == password)
+    }
+
+    pub fn create_token(&mut self, user: &str, password: &str) -> Option<String> {
+        if self.authenticate(user, password) {
+            let token = utils::generate_id();
+            self.tokens.insert(token.clone());
+            Some(token)
+        } else {
+            None
+        }
+    }
+
+    pub fn check_token(&self, token: &str) -> bool {
+        self.tokens.contains(token)
     }
 
     pub fn get_public_tags(&self) -> models::Tags {
@@ -41,7 +63,7 @@ impl State {
         expires_at: chrono::DateTime<Utc>,
         tags_aux: models::TagsAux,
     ) -> models::SessionId {
-        let session_id = models::SessionId(crate::handlers::generate_id());
+        let session_id = models::SessionId(utils::generate_id());
         let fetch_id = self.generate_fetch_id();
 
         // Create a new session and store it in the DashMap.

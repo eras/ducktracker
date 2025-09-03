@@ -423,10 +423,24 @@ impl UpdateChange {
     }
 }
 
+#[derive(Debug, Deserialize, TS)]
+#[ts(export)]
+pub struct LoginRequest {
+    pub username: String,
+    pub password: String,
+}
+
+#[derive(Debug, Serialize, TS)]
+#[ts(export)]
+pub struct LoginResponse {
+    pub token: String,
+}
+
 /// Request body for the /api/stream endpoint.
 #[derive(Debug, Deserialize)]
 pub struct StreamRequest {
     // No tags -> use all public tags
     #[serde(default = "crate::utils::CommaSeparatedVec::new")]
     pub tags: crate::utils::CommaSeparatedVec<Tag>,
+    pub token: String,
 }
