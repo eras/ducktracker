@@ -85,18 +85,32 @@ let processUpdates = (
  * Manages the Server-Sent Events (SSE) connection to the API.
  * This is a real implementation that connects to the /api/stream endpoint.
  */
-export const useProtocolStore = create<ProtocolState>((set) => ({
-  fetches: {},
-  tags: new Set<Tag>(),
-  publicTags: new Set<Tag>(),
+export const useProtocolStore = create<ProtocolState>((set) => {
+  let eventSource: EventSource | null = null;
+  let retryCount = 0;
+  let reconnectTimeoutId: number | null = null;
+  const MAX_RECONNECT_INTERVAL = 5000; // 60 seconds
 
-  connect: (tags: string[], addTags: (tags: Set<string>) => void) => {
+  const connect = (
+    tags: string[],
+    addTags: (tags: Set<string>) => void,
+  ): EventSource => {
+    if (reconnectTimeoutId) {
+      clearTimeout(reconnectTimeoutId);
+      reconnectTimeoutId = null;
+    }
+
     const tagsQuery = tags.length > 0 ? `tags=${tags.join(",")}` : "";
     const url = `${API_URL}/stream?${tagsQuery}`;
 
-    const eventSource = new EventSource(url);
+    eventSource = new EventSource(url);
 
-    eventSource.onmessage = (event) => {
+    eventSource.onopen = () => {
+      console.log("Connection opened successfully.");
+      retryCount = 0;
+    };
+
+    eventSource.onmessage = (event: MessageEvent) => {
       try {
         const data: Update = JSON.parse(event.data);
         console.log(`Processing ${JSON.stringify(data)}`);
@@ -106,15 +120,49 @@ export const useProtocolStore = create<ProtocolState>((set) => ({
       }
     };
 
-    eventSource.onerror = (error) => {
+    eventSource.onerror = (error: Event) => {
       console.error("EventSource failed:", error);
-      eventSource.close();
+      eventSource?.close();
+      scheduleReconnect(tags, addTags);
     };
 
     return eventSource;
-  },
+  };
 
-  disconnect: (eventSource: EventSource) => {
-    eventSource.close();
-  },
-}));
+  const scheduleReconnect = (
+    tags: string[],
+    addTags: (tags: Set<string>) => void,
+  ): void => {
+    const delay = Math.min(
+      MAX_RECONNECT_INTERVAL,
+      100 * Math.pow(1.5, retryCount),
+    );
+    console.log(`Attempting to reconnect in ${delay / 1000} seconds...`);
+    reconnectTimeoutId = window.setTimeout(() => {
+      if (delay < MAX_RECONNECT_INTERVAL) {
+        retryCount++;
+      }
+      connect(tags, addTags);
+    }, delay);
+  };
+
+  const disconnect = (): void => {
+    if (eventSource) {
+      eventSource.close();
+      eventSource = null;
+      console.log("Connection closed.");
+    }
+    if (reconnectTimeoutId) {
+      clearTimeout(reconnectTimeoutId);
+      reconnectTimeoutId = null;
+    }
+  };
+
+  return {
+    fetches: {},
+    tags: new Set<string>(),
+    publicTags: new Set<string>(),
+    connect,
+    disconnect,
+  };
+});
