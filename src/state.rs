@@ -14,15 +14,21 @@ pub struct State {
     public_tags: models::Tags,
 
     next_fetch_id: models::FetchId,
+
+    pub users: HashMap<String, String>, // Key: username, Value:  password (should be hashed)
 }
 
 impl State {
     pub fn new(updates: Updates) -> Self {
+        let users = utils::read_colon_separated_file("ducktracker.passwd")
+            .expect("Failed to read ducktracker.passwd");
+
         Self {
             updates,
             sessions: dashmap::DashMap::new(),
             next_fetch_id: models::FetchId::default(),
             public_tags: models::Tags::new(),
+            users,
         }
     }
 

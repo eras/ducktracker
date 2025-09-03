@@ -6,6 +6,8 @@ use crate::models::{
 };
 use crate::state;
 use actix_web::{HttpResponse, Responder, get, post, web};
+use actix_web_httpauth::extractors::basic::BasicAuth;
+use actix_web_httpauth::extractors::basic::Config as BasicAuthConfig;
 use chrono::{Duration, Utc};
 use hex;
 use log::info;
@@ -13,23 +15,9 @@ use rand::{Rng, distributions::Alphanumeric, thread_rng};
 use sha2::{Digest, Sha256};
 use tokio_stream::StreamExt; // For stream combinators like .next()
 
-/// Placeholder authentication function.
-/// This function should be replaced with real authentication logic in the future.
-pub fn check_authentication(
-    _user: &Option<String>,
-    _password: &Option<String>,
-    _session: &Session,
-) -> bool {
-    // For now, we will simply pass the authentication check.
-    // In a real-world scenario, you would hash the provided password
-    // and compare it to the stored hash in the session object.
-    //
-    // let mut hasher = Sha256::new();
-    // let provided_password = password.clone().unwrap_or_default();
-    // hasher.update(provided_password.as_bytes());
-    // let provided_password_hash = hex::encode(hasher.finalize());
-    // provided_password_hash == session.password_hash
-    true
+// Helper function for authentication
+fn authenticate_user(user: &str, password: &str, state: &crate::State) -> bool {
+    state.users.get(user).map_or(false, |p| p == password)
 }
 
 pub fn generate_id() -> String {
@@ -49,6 +37,14 @@ pub async fn create_session(
     state: web::Data<AppState>,
 ) -> impl Responder {
     let mut state = state.lock().await;
+
+    if !authenticate_user(
+        &data.user.clone().unwrap_or("".to_string()),
+        &data.password.clone().unwrap_or("".to_string()),
+        &state,
+    ) {
+        return HttpResponse::Unauthorized().finish();
+    }
 
     let tags_aux = models::TagsAux::from_share_id(&data.share_id);
 
@@ -123,10 +119,15 @@ pub async fn post_location(
 
 #[actix_web::get("/api/stream")]
 async fn stream(
+    auth: BasicAuth,
     data: web::Query<models::StreamRequest>,
     app_state: web::Data<AppState>,
-) -> impl Responder {
+) -> actix_web::Result<impl Responder> {
     let state = app_state.lock().await;
+    if !authenticate_user(auth.user_id(), auth.password().unwrap_or_default(), &state) {
+        //return HttpResponse::Unauthorized().body("Invalid credentials.");
+        return Err(actix_web::error::ErrorUnauthorized("Invalid credentials."));
+    }
     let tags = if data.tags.0.len() == 0 {
         state.get_public_tags().0.clone()
     } else {
@@ -144,5 +145,6 @@ async fn stream(
         ))
     });
 
-    actix_web_lab::sse::Sse::from_stream(events).with_keep_alive(std::time::Duration::from_secs(5))
+    Ok(actix_web_lab::sse::Sse::from_stream(events)
+        .with_keep_alive(std::time::Duration::from_secs(5)))
 }
