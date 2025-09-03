@@ -59,7 +59,7 @@ export const useAppStore = create<AppState>((set) => ({
         return {};
       } else {
         console.log(`New selected tag: ${[...newTags]}`);
-        return { tags: newTags, customTags: newTags };
+        return { tags: newTags };
       }
     }),
 

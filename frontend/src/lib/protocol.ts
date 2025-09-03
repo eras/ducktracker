@@ -21,7 +21,7 @@ const API_URL = "/api";
 let processUpdates = (
   updates: Array<UpdateChange>,
   stateIn: ProtocolState,
-  addTags: (tags: Set<string>) => void,
+  addedTags: Set<string>,
 ): {
   fetches: Fetches;
   tags: Set<Tag>;
@@ -60,7 +60,9 @@ let processUpdates = (
           ...state.publicTags,
           ...change.add_tags.public,
         ]);
-        addTags(new_tags);
+        for (const tag of new_tags) {
+          addedTags.add(tag);
+        }
       } else if ("add" in change) {
         Object.entries(change.add.points).forEach(([fetch_id, points]) => {
           if (points) {
@@ -114,7 +116,9 @@ export const useProtocolStore = create<ProtocolState>((set) => {
       try {
         const data: Update = JSON.parse(event.data);
         console.log(`Processing ${JSON.stringify(data)}`);
-        set((state) => processUpdates(data.changes, state, addTags));
+        let addedTags = new Set<string>();
+        set((state) => processUpdates(data.changes, state, addedTags));
+        addTags(addedTags);
       } catch (e) {
         console.error("Failed to parse SSE message:", e);
       }
