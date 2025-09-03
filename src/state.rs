@@ -225,19 +225,15 @@ impl Updates {
         // Modify tags so that the client doesn't learn about new tags
         let updates = {
             futures_util::StreamExt::filter_map(updates, move |x| {
-                let filter_tags = tags.clone();
+                let subscribed_tags = tags.clone();
                 async move {
                     match x {
                         Ok((context, update)) => {
-                            let shared_tags = &context.tags & &filter_tags;
-                            if shared_tags.len() > 0 {
-                                let shared_context = UpdateContext { tags: shared_tags };
-                                match update.filter_map(&filter_tags, &context).await {
-                                    None => None,
-                                    Some(update) => Some(Ok((shared_context, update))),
-                                }
-                            } else {
-                                None
+                            let shared_tags = &context.tags & &subscribed_tags;
+                            let shared_context = UpdateContext { tags: shared_tags };
+                            match update.filter_map(&subscribed_tags, &context).await {
+                                None => None,
+                                Some(update) => Some(Ok((shared_context, update))),
                             }
                         }
                         Err(_) => Some(x),
