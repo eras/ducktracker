@@ -48,7 +48,7 @@ impl State {
         if self.authenticate(user, password) {
             let token = utils::generate_id();
             self.tokens.insert(token.clone());
-	    Some(token)
+            Some(token)
         } else {
             None
         }
@@ -79,7 +79,7 @@ impl State {
             tags: tags_aux.clone().into(),
         };
         self.sessions.insert(session_id.clone(), new_session);
-	self.add_fetch(fetch_id, tags_aux).await;
+        self.add_fetch(fetch_id, tags_aux).await;
 
         session_id
     }
