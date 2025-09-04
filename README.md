@@ -27,6 +27,7 @@ involving "pub" are pushed to new and existing clients when they appear.
 
 # Configure
 
+## ducktracker
 Enter user:pass to ducktracker.passwd, e.g.
 
 ```
@@ -34,6 +35,13 @@ hello:world
 ```
 
 (encryption is not supported yet)
+
+## Hauk
+
+Use the user/pass you've configured to the password file.
+
+In the "preferred link id" field list the tags you want to share,
+separated by comma, e.g. `pub,museum`.
 
 # Run
 
