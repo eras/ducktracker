@@ -10,7 +10,7 @@ import { LoginResponse } from "../bindings/LoginResponse";
 
 export interface ProtocolState {
   fetches: Fetches;
-  tags: Set<Tag>;
+  subscribedTags: Set<Tag>;
   publicTags: Set<Tag>;
   connect: (
     tags: string[],
@@ -27,24 +27,24 @@ let processUpdates = (
   addedTags: Set<string>,
 ): {
   fetches: Fetches;
-  tags: Set<Tag>;
+  subscribedTags: Set<Tag>;
   publicTags: Set<Tag>;
 } => {
   let state = {
     fetches: { ...stateIn.fetches },
-    tags: new Set([...stateIn.tags]),
+    subscribedTags: new Set([...stateIn.subscribedTags]),
     publicTags: new Set([...stateIn.publicTags]),
   };
   for (const change of updates) {
     if (change == "reset") {
       state = {
         fetches: {},
-        tags: new Set(),
+        subscribedTags: new Set(),
         publicTags: new Set(),
       };
     } else {
       if ("add_fetch" in change) {
-        let new_tags = new Set([...change.add_fetch.public]);
+        let newTags = new Set([...change.add_fetch.public]);
         Object.entries(change.add_fetch.tags).forEach(([fetch_id, tags]) => {
           if (tags) {
             let fetch_index = parseInt(fetch_id);
@@ -54,7 +54,7 @@ let processUpdates = (
                 : { locations: [], tags: new Set<string>() };
             fetch.tags = union(fetch.tags, tags);
             for (const tag of tags) {
-              new_tags.add(tag);
+              newTags.add(tag);
             }
             state.fetches[fetch_index] = fetch;
           }
@@ -63,8 +63,8 @@ let processUpdates = (
           ...state.publicTags,
           ...change.add_fetch.public,
         ]);
-        state.tags = union(state.subscribedTags, newTags);
-        for (const tag of new_tags) {
+        state.subscribedTags = union(state.subscribedTags, newTags);
+        for (const tag of newTags) {
           addedTags.add(tag);
         }
       } else if ("add" in change) {
@@ -99,7 +99,7 @@ export const useProtocolStore = create<ProtocolState>((set) => {
 
   const connect = async (
     // Changed to async
-    tags: string[],
+    subscribedTags: string[],
     addTags: (tags: Set<string>) => void,
   ): Promise<void> => {
     // Changed return type
@@ -160,7 +160,8 @@ export const useProtocolStore = create<ProtocolState>((set) => {
     }
 
     // 2. Connect to EventSource
-    const tagsQuery = tags.length > 0 ? `tags=${tags.join(",")}` : "";
+    const tagsQuery =
+      subscribedTags.length > 0 ? `tags=${subscribedTags.join(",")}` : "";
     // Note: EventSource does not support custom headers. Credentials must be in the URL for Basic Auth.
     // Ensure your backend is configured to read `user` and `pass` query parameters.
     const credentials = `token=${encodeURIComponent(token)}`;
@@ -189,7 +190,7 @@ export const useProtocolStore = create<ProtocolState>((set) => {
       console.error("EventSource failed:", error);
       eventSource?.close(); // Close the current faulty connection
       eventSource = null; // Clear the reference
-      scheduleReconnect(tags, addTags);
+      scheduleReconnect(subscribedTags, addTags);
     };
 
     // No explicit return value needed, as EventSource is managed internally
@@ -231,7 +232,7 @@ export const useProtocolStore = create<ProtocolState>((set) => {
 
   return {
     fetches: {},
-    tags: new Set<string>(),
+    subscribedTags: new Set<string>(),
     publicTags: new Set<string>(),
     connect,
     disconnect,

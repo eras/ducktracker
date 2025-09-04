@@ -86,7 +86,7 @@ export const useAppStore = create<AppState>((set) => ({
 // Subscribe to the protocol store and merge with custom tags
 useProtocolStore.subscribe((protocolState) => {
   const combinedTags = union(
-    protocolState.tags,
+    protocolState.subscribedTags,
     useAppStore.getState().customTags,
   );
   useAppStore.setState({
@@ -100,7 +100,7 @@ useProtocolStore.subscribe((protocolState) => {
 useAppStore.subscribe((state, prevState) => {
   // Only update if the custom tags have actually changed
   if (state.customTags !== prevState.customTags) {
-    const protocolTags = useProtocolStore.getState().tags;
+    const protocolTags = useProtocolStore.getState().subscribedTags;
     const combinedTags = union(protocolTags, state.customTags);
     useAppStore.setState({
       tags: combinedTags,
