@@ -5,6 +5,7 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 use tracing_subscriber::{EnvFilter, FmtSubscriber};
 
+mod assets;
 mod bounded_set;
 mod handlers;
 mod models;
@@ -49,6 +50,7 @@ async fn main() -> std::io::Result<()> {
             .service(handlers::post_location)
             .service(handlers::stream)
             .service(handlers::login)
+            .service(assets::assets("", "index.html"))
     })
     .bind(("0.0.0.0", 8080))?
     .run()
