@@ -1,0 +1,182 @@
+name: Rust CI/CD
+
+on:
+  push:
+    branches:
+      - master # Or your default branch, e.g., 'master'
+    tags:
+      - 'v*' # Trigger on tags like v1.0, v2.0-beta, etc.
+  pull_request:
+    branches:
+      - master # Or your default branch
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # --- Frontend Build Env ---
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20' # Or your desired Node.js version (e.g., '18', '20', 'lts/*')
+          cache: 'npm'       # Caches npm dependencies
+          cache-dependency-path: frontend/package-lock.json # Point to the lock file in your frontend dir
+
+      - name: Install Frontend dependencies
+        working-directory: ./frontend # All subsequent commands in this step run from 'frontend'
+        run: npm ci # 'npm ci' is recommended for CI for deterministic installs
+
+      # --- Rust Build End ---
+
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1 # Recommended action for Rust toolchain setup
+        with:
+          toolchain: nightly # Or 'nightly' or a specific version like '1.70.0'
+          override: true
+          profile: minimal # Use minimal profile for faster downloads
+
+      - name: Cache Cargo dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      # --- Building (includes npm run build via build.rs) ---
+
+      - name: Build
+        run: |
+          scripts/export-models-types.sh
+          cd frontend && npm run build
+          cargo build --verbose --locked
+
+      - name: Run tests
+        run: cargo test --verbose
+
+      # # --- Frontend Test ---
+      # - name: Run Frontend tests
+      #   working-directory: .
+      #   run: npm test
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build-and-test # Ensure tests pass before releasing
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # --- Frontend Build ---
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20' # Or your desired Node.js version (e.g., '18', '20', 'lts/*')
+          cache: 'npm'       # Caches npm dependencies
+          cache-dependency-path: frontend/package-lock.json # Point to the lock file in your frontend dir
+
+      - name: Install Frontend dependencies
+        working-directory: ./frontend # All subsequent commands in this step run from 'frontend'
+        run: npm ci # 'npm ci' is recommended for CI for deterministic installs
+
+      # Actual building is done via build.rs
+
+      # --- Backend Build ---
+
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+          override: true
+          profile: minimal
+
+      - name: Cache Cargo dependencies (for release build)
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Build release binaries
+        run: |
+          scripts/export-models-types.sh --release
+          cd frontend && npm run build
+          cargo build --release --locked
+
+      - name: Prepare combined backend release package
+        run: |
+          # Create a temporary directory for packaging
+          mkdir ducktracker-${{ github.ref_name }}
+
+          cp README.md LICENSE.APACHE ducktracker-${{ github.ref_name }}/
+
+          # Copy the Rust binary into the root of the package directory
+          # Ensure 'ducktracker' is the correct binary name in target/release/
+          strip target/release/ducktracker
+          cp target/release/ducktracker ducktracker-${{ github.ref_name }}/
+
+          tar cvaf ducktracker-${{ github.ref_name }}-linux-amd64.tar.xz ducktracker-${{ github.ref_name }}
+
+          # Clean up temporary directory (optional but good practice)
+          rm -rf ducktracker-${{ github.ref_name }}
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref }}
+          draft: false
+          prerelease: false
+
+      - name: Upload Release Assets (Linux)
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ducktracker-${{ github.ref_name }}-linux-amd64.tar.xz
+          asset_name: ducktracker-${{ github.ref_name }}-linux-amd64.tar.xz
+          asset_content_type: application/x-xz
+
+      # Example for building and uploading for macOS
+      # You might consider a separate job for each OS if builds are long
+      # or if cross-compilation is complex.
+      - name: Build release binaries (macOS)
+        if: runner.os == 'macOS' # This would run only if the runner is macOS, which it isn't in this job
+        run: |
+          # This part is illustrative. To build for macOS on a Linux runner,
+          # you would need cross-compilation tools (e.g., rustup target add x86_64-apple-darwin)
+          # and specific build commands. For simplicity, often a separate job is used.
+          echo "Cross-compilation for macOS from Linux needs specific setup."
+          echo "Consider a separate job with 'runs-on: macos-latest'."
+          # For a real cross-compile (complex, usually better with a separate job):
+          # rustup target add x86_64-apple-darwin
+          # cargo build --release --target x86_64-apple-darwin
+          # mv target/x86_64-apple-darwin/release/ducktracker ducktracker-darwin-amd64
+
+      # Example for building and uploading for Windows
+      - name: Build release binaries (Windows)
+        if: runner.os == 'windows' # This would run only if the runner is Windows, which it isn't in this job
+        run: |
+          # Similar to macOS, cross-compilation for Windows from Linux needs setup.
+          echo "Cross-compilation for Windows from Linux needs specific setup."
+          echo "Consider a separate job with 'runs-on: windows-latest'."
+          # For a real cross-compile (complex, usually better with a separate job):
+          # rustup target add x86_64-pc-windows-gnu # or x86_64-pc-windows-msvc
+          # cargo build --release --target x86_64-pc-windows-gnu
+          # mv target/x86_64-pc-windows-gnu/release/ducktracker.exe ducktracker-windows-amd64.exe
