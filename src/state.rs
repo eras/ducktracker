@@ -1,9 +1,13 @@
+use crate::bounded_set;
 use crate::models::{self, Location, Update, UpdateChange};
 use crate::utils;
 use chrono::Utc;
+use rand::{Rng, thread_rng};
 use std::collections::HashSet;
 use std::{collections::HashMap, pin::Pin, sync::Arc};
 use tokio::sync::{RwLock, broadcast};
+
+const MAX_TOKENS: usize = 100000;
 
 pub enum Error {
     NoSuchSession,
@@ -18,7 +22,7 @@ pub struct State {
     next_fetch_id: models::FetchId,
 
     pub users: HashMap<String, String>, // Key: username, Value:  password (should be hashed)
-    pub tokens: HashSet<String>,
+    pub tokens: bounded_set::BoundedSet<String>,
 }
 
 impl State {
@@ -32,7 +36,7 @@ impl State {
             next_fetch_id: models::FetchId::default(),
             public_tags: models::Tags::new(),
             users,
-            tokens: HashSet::new(),
+            tokens: bounded_set::BoundedSet::new(MAX_TOKENS),
         }
     }
 
@@ -44,7 +48,7 @@ impl State {
         if self.authenticate(user, password) {
             let token = utils::generate_id();
             self.tokens.insert(token.clone());
-            Some(token)
+	    Some(token)
         } else {
             None
         }
@@ -75,7 +79,7 @@ impl State {
             tags: tags_aux.clone().into(),
         };
         self.sessions.insert(session_id.clone(), new_session);
-        self.add_fetch(fetch_id, tags_aux).await;
+	self.add_fetch(fetch_id, tags_aux).await;
 
         session_id
     }

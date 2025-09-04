@@ -5,6 +5,7 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 use tracing_subscriber::{EnvFilter, FmtSubscriber};
 
+mod bounded_set;
 mod handlers;
 mod models;
 mod state;
