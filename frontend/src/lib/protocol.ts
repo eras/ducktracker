@@ -63,6 +63,7 @@ let processUpdates = (
           ...state.publicTags,
           ...change.add_fetch.public,
         ]);
+        state.tags = union(state.subscribedTags, newTags);
         for (const tag of new_tags) {
           addedTags.add(tag);
         }
