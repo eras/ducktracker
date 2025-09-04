@@ -19,7 +19,7 @@ only to others aware of the same tag.
 Then there are public tags, which start with the string "pub". Shares
 involving "pub" are pushed to new and existing clients when they appear.
 
-# Compliation
+# Compilation
 
 1) `scripts/export-models-types.sh` to generate frontend/bindings
 2) (cd frontend && npm install && npm run build)
