@@ -206,6 +206,24 @@ pub struct ShareId(pub String);
 #[ts(export)]
 pub struct Tag(pub String);
 
+impl Tag {
+    pub fn new(tag: String) -> Self {
+        Tag(tag)
+    }
+
+    pub fn is_public(&self) -> bool {
+        self.0.starts_with("pub")
+    }
+
+    pub fn visibility(&self) -> TagVisibility {
+        if self.is_public() {
+            TagVisibility::Public
+        } else {
+            TagVisibility::Private
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export)]
 pub struct Tags(pub HashSet<Tag>);
@@ -257,11 +275,7 @@ impl TagsAux {
                 let tags: HashSet<(Tag, TagVisibility)> = share_id
                     .split(",")
                     .map(|x| {
-                        let visibility = if x.starts_with("pub") {
-                            TagVisibility::Public
-                        } else {
-                            TagVisibility::Private
-                        };
+                        let visibility = Tag::new(x.to_string()).visibility();
                         (Tag(x.to_string()), visibility)
                     })
                     .collect();

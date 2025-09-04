@@ -1,11 +1,15 @@
 use crate::bounded_set;
+use crate::db::DbClient;
+use crate::db_models::DbSession;
 use crate::models::{self, Location, Update, UpdateChange};
 use crate::utils;
+use anyhow::Result as AnyhowResult;
 use chrono::Utc;
 use rand::{Rng, thread_rng};
 use std::collections::HashSet;
 use std::{collections::HashMap, pin::Pin, sync::Arc};
-use tokio::sync::{RwLock, broadcast};
+use tokio::sync::{RwLock, broadcast}; // Use AnyhowResult to differentiate from crate::Error
+use tokio::task;
 
 const MAX_TOKENS: usize = 100000;
 
@@ -23,21 +27,65 @@ pub struct State {
 
     pub users: HashMap<String, String>, // Key: username, Value:  password (should be hashed)
     pub tokens: bounded_set::BoundedSet<String>,
+
+    db_client: Arc<DbClient>, // Add the database client
 }
 
 impl State {
-    pub fn new(updates: Updates) -> Self {
+    pub async fn new(updates: Updates) -> AnyhowResult<Self> {
         let users = utils::read_colon_separated_file("ducktracker.passwd")
             .expect("Failed to read ducktracker.passwd");
 
-        Self {
+        let db_client = Arc::new(DbClient::new().await?); // Initialize DB client
+
+        let mut state = Self {
             updates,
             sessions: dashmap::DashMap::new(),
             next_fetch_id: models::FetchId::default(),
             public_tags: models::Tags::new(),
             users,
             tokens: bounded_set::BoundedSet::new(MAX_TOKENS),
+            db_client,
+        };
+
+        state.load_state().await?;
+
+        Ok(state)
+    }
+
+    async fn load_state(&mut self) -> AnyhowResult<()> {
+        // Load sessions from the database
+        let now = Utc::now();
+        let mut highest_fetch_id = 0;
+
+        let db_sessions = self.db_client.get_all_sessions().await?;
+        for db_session in db_sessions {
+            if db_session.expires_at > now {
+                // Session is still active, re-add it to the in-memory state
+                let session: models::Session = db_session.into();
+
+                // Re-populate public tags from the restored session
+                for tag in session.tags.0.iter() {
+                    if tag.is_public() {
+                        self.public_tags.0.insert(tag.clone());
+                    }
+                }
+
+                // Update next_fetch_id to be greater than any loaded fetch_id
+                if session.fetch_id.0 > highest_fetch_id {
+                    highest_fetch_id = session.fetch_id.0;
+                }
+
+                self.sessions.insert(session.session_id.clone(), session);
+            } else {
+                // Session has expired, remove it from the database
+                self.db_client
+                    .delete_session(&db_session.session_id)
+                    .await?;
+            }
         }
+        self.next_fetch_id = models::FetchId(highest_fetch_id + 1);
+        Ok(())
     }
 
     pub fn authenticate(&self, user: &str, password: &str) -> bool {
@@ -78,8 +126,18 @@ impl State {
             fetch_id: fetch_id.clone(),
             tags: tags_aux.clone().into(),
         };
-        self.sessions.insert(session_id.clone(), new_session);
+        self.sessions
+            .insert(session_id.clone(), new_session.clone());
         self.add_fetch(fetch_id, tags_aux).await;
+
+        // Persist the new session to the database asynchronously
+        let db_client = self.db_client.clone();
+        let db_session: DbSession = (&new_session).into();
+        task::spawn(async move {
+            if let Err(e) = db_client.insert_session(&db_session).await {
+                eprintln!("Failed to insert session into DB: {:?}", e);
+            }
+        });
 
         session_id
     }
@@ -98,6 +156,15 @@ impl State {
                 .to_vec(),
             };
             self.updates.send_update(context, update);
+
+            // Delete the session from the database asynchronously
+            let db_client = self.db_client.clone();
+            let session_id_clone = session_id.clone();
+            task::spawn(async move {
+                if let Err(e) = db_client.delete_session(&session_id_clone).await {
+                    eprintln!("Failed to delete session from DB: {:?}", e);
+                }
+            });
         }
     }
 
@@ -143,6 +210,16 @@ impl State {
         if session.expires_at < now {
             drop(session);
             self.sessions.remove(&data.session_id);
+
+            // If session expired, also remove it from the database asynchronously
+            let db_client = self.db_client.clone();
+            let session_id_clone = data.session_id.clone();
+            task::spawn(async move {
+                if let Err(e) = db_client.delete_session(&session_id_clone).await {
+                    eprintln!("Failed to delete expired session from DB: {:?}", e);
+                }
+            });
+
             return Err(Error::SessionExpired);
         }
 

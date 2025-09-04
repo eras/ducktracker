@@ -7,6 +7,8 @@ use tracing_subscriber::{EnvFilter, FmtSubscriber};
 
 mod assets;
 mod bounded_set;
+mod db;
+mod db_models;
 mod handlers;
 mod models;
 mod state;
@@ -32,7 +34,9 @@ async fn main() -> std::io::Result<()> {
 
     // Create the shared application state.
     let updates = state::Updates::new();
-    let app_state: AppState = Arc::new(Mutex::new(State::new(updates)));
+    let app_state: AppState = Arc::new(Mutex::new(
+        State::new(updates).await.expect("Failed to create state"),
+    ));
 
     info!("Starting server at http://127.0.0.1:8080");
 
