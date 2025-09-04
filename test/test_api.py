@@ -23,7 +23,7 @@ class AddTagsTags(BaseModel):
 
 
 class AddTags(BaseModel):
-    add_tags: AddTagsTags  # tags added by this add tags update
+    add_fetch: AddTagsTags  # tags added by this add tags update
 
 
 # lat, lon, time (epoch in micros), speed, accuracy, GPS source (0 or 1)
@@ -104,7 +104,7 @@ class HaukApiTest(unittest.TestCase):
             stream_sse = self.stream_sse([tag])
             first = next(stream_sse)
             self.assertEqual(first.changes[0], "reset")
-            self.assertEqual(list(first.changes[1].add_tags.tags.values()), [[tag]])
+            self.assertEqual(list(first.changes[1].add_fetch.tags.values()), [[tag]])
             self.assertEqual(list(first.changes[2].add.points.values()), [[]])
 
         except requests.exceptions.RequestException as e:
@@ -161,7 +161,7 @@ class HaukApiTest(unittest.TestCase):
             stream_sse = self.stream_sse([tag])
             first = next(stream_sse)
             self.assertEqual(first.changes[0], "reset")
-            self.assertEqual(list(first.changes[1].add_tags.tags.values()), [[tag]])
+            self.assertEqual(list(first.changes[1].add_fetch.tags.values()), [[tag]])
             points = list(first.changes[2].add.points.values())
             self.assertAlmostEqual(points[0][0][0], location_data["lat"])
             self.assertAlmostEqual(points[0][0][1], location_data["lon"])

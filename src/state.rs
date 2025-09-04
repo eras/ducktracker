@@ -75,7 +75,7 @@ impl State {
             tags: tags_aux.clone().into(),
         };
         self.sessions.insert(session_id.clone(), new_session);
-        self.add_tags(fetch_id, tags_aux).await;
+        self.add_fetch(fetch_id, tags_aux).await;
 
         session_id
     }
@@ -97,7 +97,7 @@ impl State {
         }
     }
 
-    pub async fn add_tags(&mut self, fetch_id: models::FetchId, tags_aux: models::TagsAux) {
+    pub async fn add_fetch(&mut self, fetch_id: models::FetchId, tags_aux: models::TagsAux) {
         for (tag, visibility) in tags_aux.0.iter() {
             if *visibility == models::TagVisibility::Public {
                 self.public_tags.0.insert(tag.clone());
@@ -113,7 +113,7 @@ impl State {
         let update = Update {
             server_time: models::TimeUsec(std::time::SystemTime::now()),
             interval: 0u64,
-            changes: [UpdateChange::AddTags {
+            changes: [UpdateChange::AddFetch {
                 tags: new_tags,
                 public: public_tags,
             }]
@@ -223,7 +223,7 @@ impl Updates {
             .filter(|x| (&x.value().tags & &tags).len() > 0)
             .map(|x| (x.value().fetch_id, x.value().locations.clone()))
             .collect();
-        changes.push(UpdateChange::AddTags {
+        changes.push(UpdateChange::AddFetch {
             tags: fetch_tags,
             public: state.public_tags.clone(),
         });

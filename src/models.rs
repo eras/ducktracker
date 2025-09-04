@@ -354,8 +354,8 @@ pub enum UpdateChange {
     // Reset all client state
     #[serde(rename = "reset")]
     Reset,
-    #[serde(rename = "add_tags")]
-    AddTags {
+    #[serde(rename = "add_fetch")]
+    AddFetch {
         // Only includes the tags the client has subscribed to
         tags: HashMap<FetchId, Tags>,
 
@@ -380,7 +380,7 @@ impl UpdateChange {
     ) -> Option<UpdateChange> {
         match self {
             Self::Reset => Some(self.clone()),
-            Self::AddTags { tags, public } => {
+            Self::AddFetch { tags, public } => {
                 let tags = tags
                     .into_iter()
                     .filter_map(|(fetch_id, tags)| {
@@ -392,7 +392,7 @@ impl UpdateChange {
                         }
                     })
                     .collect();
-                Some(UpdateChange::AddTags {
+                Some(UpdateChange::AddFetch {
                     tags,
                     public: public.clone(),
                 })

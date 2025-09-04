@@ -43,9 +43,9 @@ let processUpdates = (
         publicTags: new Set(),
       };
     } else {
-      if ("add_tags" in change) {
-        let new_tags = new Set([...change.add_tags.public]);
-        Object.entries(change.add_tags.tags).forEach(([fetch_id, tags]) => {
+      if ("add_fetch" in change) {
+        let new_tags = new Set([...change.add_fetch.public]);
+        Object.entries(change.add_fetch.tags).forEach(([fetch_id, tags]) => {
           if (tags) {
             let fetch_index = parseInt(fetch_id);
             let fetch =
@@ -61,7 +61,7 @@ let processUpdates = (
         });
         state.publicTags = new Set([
           ...state.publicTags,
-          ...change.add_tags.public,
+          ...change.add_fetch.public,
         ]);
         for (const tag of new_tags) {
           addedTags.add(tag);
