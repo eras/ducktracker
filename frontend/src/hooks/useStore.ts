@@ -15,6 +15,7 @@ interface AppState {
 }
 
 const CUSTOM_TAGS_KEY = "customTags";
+const SELECTED_TAGS_KEY = "selectedTags";
 
 // Helper function for localStorage
 const getStoredTags = (): Set<string> => {
@@ -27,6 +28,17 @@ const getStoredTags = (): Set<string> => {
   }
 };
 
+// Helper function for localStorage
+const getSelectedTags = (): Set<string> => {
+  try {
+    const stored = localStorage.getItem(SELECTED_TAGS_KEY);
+    return stored ? new Set(JSON.parse(stored)) : new Set<string>();
+  } catch (e) {
+    console.error("Failed to load selected tags from localStorage", e);
+    return new Set();
+  }
+};
+
 const saveTagsToStorage = (tags: Set<string>) => {
   try {
     localStorage.setItem(CUSTOM_TAGS_KEY, JSON.stringify([...tags]));
@@ -35,8 +47,16 @@ const saveTagsToStorage = (tags: Set<string>) => {
   }
 };
 
+const saveSelectedTagsToStorage = (selectedTags: Set<string>) => {
+  try {
+    localStorage.setItem(SELECTED_TAGS_KEY, JSON.stringify([...selectedTags]));
+  } catch (e) {
+    console.error("Failed to save selected tags to localStorage", e);
+  }
+};
+
 export const useAppStore = create<AppState>((set) => ({
-  selectedTags: new Set<string>(),
+  selectedTags: getSelectedTags(),
   fetches: {},
   tags: new Set<string>(),
   customTags: getStoredTags(),
@@ -49,6 +69,7 @@ export const useAppStore = create<AppState>((set) => ({
       } else {
         newTags.add(tag);
       }
+      saveSelectedTagsToStorage(newTags);
       return { selectedTags: newTags };
     }),
 
@@ -58,7 +79,7 @@ export const useAppStore = create<AppState>((set) => ({
       if (difference(newTags, state.tags).size == 0) {
         return {};
       } else {
-        console.log(`New selected tag: ${[...newTags]}`);
+        console.log(`New tag: ${[...newTags]}`);
         return { tags: newTags };
       }
     }),
