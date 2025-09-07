@@ -79,7 +79,6 @@ export const useAppStore = create<AppState>((set) => ({
       if (difference(newTags, state.tags).size == 0) {
         return {};
       } else {
-        console.log(`New tag: ${[...newTags]}`);
         return { tags: newTags };
       }
     }),

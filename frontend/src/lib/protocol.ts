@@ -113,7 +113,6 @@ export const useProtocolStore = create<ProtocolState>((set) => {
     if (eventSource) {
       eventSource.close();
       eventSource = null;
-      console.log("Previous connection closed before new attempt.");
     }
 
     const { username, password, showLogin, clearCredentials } =
@@ -170,14 +169,12 @@ export const useProtocolStore = create<ProtocolState>((set) => {
     eventSource = new EventSource(url);
 
     eventSource.onopen = () => {
-      console.log("Connection opened successfully.");
       retryCount = 0;
     };
 
     eventSource.onmessage = (event: MessageEvent) => {
       try {
         const data: Update = JSON.parse(event.data);
-        console.log(`Processing ${JSON.stringify(data)}`);
         let addedTags = new Set<string>();
         set((state) => processUpdates(data.changes, state, addedTags));
         addTags(addedTags);
@@ -221,7 +218,6 @@ export const useProtocolStore = create<ProtocolState>((set) => {
     if (eventSource) {
       eventSource.close();
       eventSource = null;
-      console.log("Connection closed.");
     }
     if (reconnectTimeoutId) {
       clearTimeout(reconnectTimeoutId);
