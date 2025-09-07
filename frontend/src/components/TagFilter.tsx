@@ -26,19 +26,31 @@ const TagFilter: React.FC = () => {
         {tags.size > 0 ? (
           [...tags].map((tag) => {
             const isCustom = customTags.has(tag);
+            const isSelected = selectedTags.has(tag);
+
+            // Determine the dynamic classes based on the tag's state.
+            let colorClasses;
+            if (isCustom) {
+              colorClasses = isSelected
+                ? "bg-purple-500 text-white ring-purple-500"
+                : "bg-purple-200 text-purple-800 hover:bg-purple-300 ring-purple-300";
+            } else {
+              colorClasses = isSelected
+                ? "bg-blue-500 text-white ring-blue-500"
+                : "bg-gray-200 text-gray-800 hover:bg-gray-300 ring-gray-300";
+            }
+
+            // Combine static and dynamic classes.
+            const buttonClasses = `
+              px-4 py-2 rounded-full font-semibold transition-colors duration-200
+              shadow-md focus:outline-none focus:ring-2 focus:ring-opacity-50
+              ${colorClasses}
+            `;
             return (
               <div key={tag} className="relative group">
                 <button
                   onClick={() => toggleTag(tag)}
-                  className={`
-                    px-4 py-2 rounded-full font-semibold transition-colors duration-200
-                    shadow-md focus:outline-none focus:ring-2 focus:ring-opacity-50
-                    ${
-                      selectedTags.has(tag)
-                        ? "bg-blue-500 text-white ring-blue-500"
-                        : "bg-gray-200 text-gray-800 hover:bg-gray-300 ring-gray-300"
-                    }
-                  `}
+                  className={buttonClasses}
                 >
                   {tag}
                 </button>
