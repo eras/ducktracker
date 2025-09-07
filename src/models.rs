@@ -79,6 +79,9 @@ impl CreateResponse {
 pub struct StopRequest {
     #[serde(rename = "sid")]
     pub session_id: SessionId,
+
+    // We don't use it, but it's part of the protocol
+    #[allow(dead_code)]
     #[serde(rename = "lid")]
     pub share_id: Option<String>,
 }
