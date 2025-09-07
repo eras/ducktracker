@@ -1,4 +1,4 @@
-use rand::{Rng, distributions::Alphanumeric, thread_rng};
+use rand::{Rng, distributions::Alphanumeric};
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::fs::File;

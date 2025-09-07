@@ -1,19 +1,13 @@
-use std::collections::HashMap;
 
 use crate::AppState;
 use crate::models::{
-    self, CreateRequest, CreateResponse, Location, LoginResponse, PostRequest, PostResponse,
-    Session, TimeUsec,
+    self, CreateRequest, CreateResponse, LoginResponse, PostRequest, PostResponse,
 };
 use crate::state;
 use crate::utils;
-use actix_web::{HttpResponse, Responder, get, post, web};
-use actix_web_httpauth::extractors::basic::BasicAuth;
-use actix_web_httpauth::extractors::basic::Config as BasicAuthConfig;
+use actix_web::{HttpResponse, Responder, post, web};
 use chrono::{Duration, Utc};
-use hex;
-use log::info;
-use sha2::{Digest, Sha256};
+use sha2::Digest;
 use tokio_stream::StreamExt; // For stream combinators like .next()
 
 /// Handler for the `/api/create` endpoint.

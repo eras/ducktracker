@@ -5,10 +5,8 @@ use crate::models::{self, Location, Update, UpdateChange};
 use crate::utils;
 use anyhow::Result as AnyhowResult;
 use chrono::Utc;
-use rand::{Rng, thread_rng};
-use std::collections::HashSet;
 use std::{collections::HashMap, pin::Pin, sync::Arc};
-use tokio::sync::{RwLock, broadcast}; // Use AnyhowResult to differentiate from crate::Error
+use tokio::sync::broadcast; // Use AnyhowResult to differentiate from crate::Error
 use tokio::task;
 
 const MAX_TOKENS: usize = 100000;

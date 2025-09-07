@@ -2,11 +2,11 @@
 
 use crate::db_models::DbSession;
 use crate::models::{FetchId, SessionId, Tags};
-use anyhow::{Result, anyhow};
+use anyhow::Result;
 use chrono::{DateTime, Utc};
 use serde_json;
 use std::sync::Arc;
-use turso::{Builder, Database, Row, Value};
+use turso::{Builder, Database, Row};
 
 /// Client for interacting with the Turso (SQLite) database.
 pub struct DbClient {
