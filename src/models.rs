@@ -237,8 +237,10 @@ pub enum TagVisibility {
     Public,
 }
 
+pub type TagAux = (Tag, TagVisibility);
+
 #[derive(Debug, Clone)]
-pub struct TagsAux(pub HashSet<(Tag, TagVisibility)>);
+pub struct TagsAux(pub HashSet<TagAux>);
 
 impl Into<Tags> for TagsAux {
     fn into(self) -> Tags {
@@ -275,13 +277,29 @@ impl TagsAux {
         match share_id {
             None => TagsAux(HashSet::new()), // TODO: in this case, use some configurable default tag
             Some(share_id) => {
-                let tags: HashSet<(Tag, TagVisibility)> = share_id
-                    .split(",")
-                    .map(|x| {
-                        let visibility = Tag::new(x.to_string()).visibility();
-                        (Tag(x.to_string()), visibility)
-                    })
-                    .collect();
+                let mut tags: HashSet<(Tag, TagVisibility)> = HashSet::new();
+                let mut visibility = TagVisibility::Public;
+                for field in share_id.split(",") {
+                    if let Some((keyword, tag)) = field.split_once(':') {
+                        let set_visibility = match keyword {
+                            "pub" | "public" => Some(TagVisibility::Public),
+                            "priv" | "private" => Some(TagVisibility::Private),
+                            _ => None,
+                        };
+                        match set_visibility {
+                            Some(set_visibility) => {
+                                visibility = set_visibility;
+                                tags.insert((Tag::new(tag.to_string()), visibility.clone()));
+                            }
+                            None => {
+                                // Ignore further tags, there was an invalid keyord
+                                break;
+                            }
+                        }
+                    } else {
+                        tags.insert((Tag::new(field.to_string()), visibility.clone()));
+                    }
+                }
                 TagsAux(tags)
             }
         }
