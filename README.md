@@ -11,13 +11,19 @@ visiting some place to see where each others are going. This happens
 by configuring the Hauk client to publish certain tags.
 
 One such tag could be "museum", used by the subgroup of people
-visiting museums. Then when using the web client, one can see the
-location of the group, assuming the user knows the keyword "museum" to
-enter to the client. So normal tags are private, they will be shared
-only to others aware of the same tag.
+visiting museums. If the share is made as a public one, which is the
+default, then it will appear to others when they just select the tag
+(or have no tags selected).  If the share is private, the others will
+need to know to add the "museum" tag to their clients to track it.
 
-Then there are public tags, which start with the string "pub". Shares
-involving "pub" are pushed to new and existing clients when they appear.
+To make private tags, configure the `Preferred link ID` in Hauk client
+to have the word `private:` or `priv:`, after which all the links are
+considered private, until the keyword `public:` or `pub:` is seen. So e.g.:
+
+`everyone,priv:flux-at-the-bar`
+
+would result in two shares: `everyone` would be public, while
+`flux-at-the-bar` would be private.
 
 # Compilation
 

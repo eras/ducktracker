@@ -65,7 +65,7 @@ impl State {
                 // Re-populate public tags from the restored session
                 for tag in session.tags.0.iter() {
                     if tag.is_public() {
-                        self.public_tags.0.insert(tag.clone());
+                        self.public_tags.0.insert(tag.as_tag());
                     }
                 }
 
@@ -143,7 +143,7 @@ impl State {
     pub async fn remove_session(&mut self, session_id: &models::SessionId) {
         if let Some((_session_id, session)) = self.sessions.remove(session_id) {
             let context = UpdateContext {
-                tags: session.tags.clone(),
+                tags: session.tags.as_tags(),
             };
             let update = Update {
                 server_time: models::TimeUsec(std::time::SystemTime::now()),
@@ -167,9 +167,9 @@ impl State {
     }
 
     pub async fn add_fetch(&mut self, fetch_id: models::FetchId, tags_aux: models::TagsAux) {
-        for (tag, visibility) in tags_aux.0.iter() {
-            if *visibility == models::TagVisibility::Public {
-                self.public_tags.0.insert(tag.clone());
+        for tag in tags_aux.0.iter() {
+            if tag.visibility == models::TagVisibility::Public {
+                self.public_tags.0.insert(tag.as_tag());
             }
         }
 
@@ -238,7 +238,7 @@ impl State {
         points.insert(session.fetch_id, [new_location].to_vec());
 
         let context = UpdateContext {
-            tags: session.tags.clone(),
+            tags: session.tags.as_tags().clone(),
         };
 
         let update = Update {
@@ -288,7 +288,7 @@ impl Updates {
             .iter()
             .filter_map(|x| {
                 let session = &x.value();
-                let shared_tags = &session.tags & &tags;
+                let shared_tags = &session.tags.as_tags() & &tags;
                 if shared_tags.len() > 0 {
                     Some((session.fetch_id, shared_tags))
                 } else {
@@ -299,7 +299,7 @@ impl Updates {
         let points = state
             .sessions
             .iter()
-            .filter(|x| (&x.value().tags & &tags).len() > 0)
+            .filter(|x| (&x.value().tags.as_tags() & &tags).len() > 0)
             .map(|x| (x.value().fetch_id, x.value().locations.clone()))
             .collect();
         changes.push(UpdateChange::AddFetch {

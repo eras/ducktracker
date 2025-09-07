@@ -32,7 +32,7 @@ pub struct Session {
     pub locations: Vec<Location>,
     pub expires_at: DateTime<Utc>,
     pub fetch_id: FetchId,
-    pub tags: Tags,
+    pub tags: TagsAux,
 }
 
 // ========================
@@ -213,38 +213,53 @@ impl Tag {
     pub fn new(tag: String) -> Self {
         Tag(tag)
     }
-
-    pub fn is_public(&self) -> bool {
-        self.0.starts_with("pub")
-    }
-
-    pub fn visibility(&self) -> TagVisibility {
-        if self.is_public() {
-            TagVisibility::Public
-        } else {
-            TagVisibility::Private
-        }
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export)]
 pub struct Tags(pub HashSet<Tag>);
 
-#[derive(Debug, Clone, Hash, Eq, PartialEq)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub enum TagVisibility {
     Private,
     Public,
 }
 
-pub type TagAux = (Tag, TagVisibility);
+#[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
+pub struct TagAux {
+    pub name: Tag,
+    pub visibility: TagVisibility,
+}
 
-#[derive(Debug, Clone)]
+impl TagAux {
+    pub fn new(name: &str, visibility: TagVisibility) -> Self {
+        TagAux {
+            name: Tag::new(name.to_string()),
+            visibility,
+        }
+    }
+
+    pub fn as_tag(&self) -> Tag {
+        self.name.clone()
+    }
+
+    pub fn is_public(&self) -> bool {
+        self.visibility == TagVisibility::Public
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TagsAux(pub HashSet<TagAux>);
+
+impl TagsAux {
+    pub fn as_tags(&self) -> Tags {
+        Tags(self.0.iter().map(|x| x.name.clone()).collect())
+    }
+}
 
 impl Into<Tags> for TagsAux {
     fn into(self) -> Tags {
-        Tags(self.0.into_iter().map(|(x, _)| x).collect())
+        Tags(self.0.into_iter().map(|tag_aux| tag_aux.as_tag()).collect())
     }
 }
 
@@ -277,7 +292,7 @@ impl TagsAux {
         match share_id {
             None => TagsAux(HashSet::new()), // TODO: in this case, use some configurable default tag
             Some(share_id) => {
-                let mut tags: HashSet<(Tag, TagVisibility)> = HashSet::new();
+                let mut tags = HashSet::new();
                 let mut visibility = TagVisibility::Public;
                 for field in share_id.split(",") {
                     if let Some((keyword, tag)) = field.split_once(':') {
@@ -289,7 +304,7 @@ impl TagsAux {
                         match set_visibility {
                             Some(set_visibility) => {
                                 visibility = set_visibility;
-                                tags.insert((Tag::new(tag.to_string()), visibility.clone()));
+                                tags.insert(TagAux::new(tag, visibility.clone()));
                             }
                             None => {
                                 // Ignore further tags, there was an invalid keyord
@@ -297,7 +312,7 @@ impl TagsAux {
                             }
                         }
                     } else {
-                        tags.insert((Tag::new(field.to_string()), visibility.clone()));
+                        tags.insert(TagAux::new(field, visibility.clone()));
                     }
                 }
                 TagsAux(tags)
@@ -308,9 +323,9 @@ impl TagsAux {
     pub fn public_tags(&self) -> Tags {
         self.0
             .iter()
-            .filter_map(|(tag, visibility)| match visibility {
+            .filter_map(|tag_aux| match tag_aux.visibility {
                 TagVisibility::Private => None,
-                TagVisibility::Public => Some(tag.clone()),
+                TagVisibility::Public => Some(tag_aux.as_tag()),
             })
             .collect()
     }

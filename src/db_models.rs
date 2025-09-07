@@ -1,6 +1,6 @@
 // src/db_models.rs
 
-use crate::models::{self, SessionId, Tags};
+use crate::models::{self, SessionId, TagsAux};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
@@ -11,7 +11,7 @@ pub struct DbSession {
     pub session_id: SessionId,
     pub expires_at: DateTime<Utc>,
     pub fetch_id: models::FetchId,
-    pub tags: Tags,
+    pub tags: TagsAux,
 }
 
 impl From<&models::Session> for DbSession {

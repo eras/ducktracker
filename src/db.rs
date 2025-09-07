@@ -1,7 +1,7 @@
 // src/db.rs
 
 use crate::db_models::DbSession;
-use crate::models::{FetchId, SessionId, Tags};
+use crate::models::{FetchId, SessionId, TagsAux};
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use serde_json;
@@ -42,7 +42,7 @@ impl DbClient {
     /// Inserts a `DbSession` into the database.
     pub async fn insert_session(&self, session: &DbSession) -> Result<()> {
         let conn = self.client.connect()?;
-        // Serialize Tags into a JSON string for storage
+        // Serialize TagAux into a JSON string for storage
         let tags_json = serde_json::to_string(&session.tags)?;
         conn.execute(
             "INSERT INTO sessions (session_id, expires_at, fetch_id, tags) VALUES (?, ?, ?, ?)",
@@ -86,7 +86,7 @@ impl DbClient {
         let session_id = SessionId(session_id_val);
         let expires_at = DateTime::parse_from_rfc3339(&expires_at_val)?.with_timezone(&Utc);
         let fetch_id = FetchId(u32::try_from(fetch_id_val).unwrap());
-        let tags: Tags =
+        let tags: TagsAux =
             serde_json::from_str(&tags_val).expect("Failed to read tags from database");
 
         Ok(DbSession {
