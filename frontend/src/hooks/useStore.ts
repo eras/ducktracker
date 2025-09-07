@@ -98,8 +98,9 @@ export const useAppStore = create<AppState>((set) => ({
   removeCustomTag: (tag: string) =>
     set((state) => {
       const newCustomTags = difference(state.customTags, new Set([tag]));
+      const newSelectedTags = difference(state.selectedTags, new Set([tag]));
       saveTagsToStorage(newCustomTags);
-      return { customTags: newCustomTags };
+      return { customTags: newCustomTags, selectedTags: newSelectedTags };
     }),
 }));
 
