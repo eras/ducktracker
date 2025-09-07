@@ -24,6 +24,7 @@ pub type AppState = Arc<Mutex<State>>;
 /// Main function to set up and run the `actix-web` server.
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
+    println!("Starting");
     // Set up a subscriber to log messages to the console, forcing them to be unbuffered.
     // This explicitly writes to stdout and should resolve the issue.
     FmtSubscriber::builder()
