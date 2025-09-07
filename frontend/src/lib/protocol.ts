@@ -95,7 +95,7 @@ export const useProtocolStore = create<ProtocolState>((set) => {
   let eventSource: EventSource | null = null;
   let retryCount = 0;
   let reconnectTimeoutId: number | null = null;
-  const MAX_RECONNECT_INTERVAL = 5000; // 5 seconds (was 60s in comment, but 5s in code)
+  const MAX_RECONNECT_INTERVAL = 5000;
 
   const connect = async (
     // Changed to async
@@ -141,14 +141,16 @@ export const useProtocolStore = create<ProtocolState>((set) => {
         },
       });
 
-      if (response.status === 401 || response.status === 403) {
+      if (response.status === 401) {
         console.error("Authentication failed during pre-flight check.");
         clearCredentials(); // Old credentials are bad
         showLogin();
         return; // Return early, connection cannot be established
       }
-      if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
-
+      if (!response.ok) {
+        scheduleReconnect(subscribedTags, addTags);
+        return;
+      }
       const result: LoginResponse = await response.json();
       token = result.token;
     } catch (e) {
