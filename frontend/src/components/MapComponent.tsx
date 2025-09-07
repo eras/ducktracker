@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from "react";
 import { useAppStore } from "../hooks/useStore";
 import { intersection } from "../lib/set";
+import useThrottle from "../hooks/useThrottle";
 import "leaflet";
 
 // Use a global L from the script tag
@@ -13,6 +14,7 @@ const MapComponent: React.FC = () => {
   const polylinesRef = useRef<L.LayerGroup | null>(null); // Reference for the trace lines
   const isFirstUpdateRef = useRef(true);
   const { fetches, selectedTags } = useAppStore();
+  const throttledFetches = useThrottle(fetches, 1000);
 
   // Initialize the map (runs only once)
   useEffect(() => {
@@ -54,7 +56,7 @@ const MapComponent: React.FC = () => {
     polylinesRef.current.clearLayers();
 
     // Add new markers and polylines based on filtered data
-    Object.entries(fetches).forEach(([_fetch_id, fetch]) => {
+    Object.entries(throttledFetches).forEach(([_fetch_id, fetch]) => {
       const hasSelectedTag = intersection(fetch.tags, selectedTags).size !== 0;
       const isFiltered = selectedTags.size > 0 && !hasSelectedTag;
 
@@ -85,14 +87,16 @@ const MapComponent: React.FC = () => {
       }
     });
 
-    const allLocs = Object.values(fetches).flatMap((trace) => trace.locations);
+    const allLocs = Object.values(throttledFetches).flatMap(
+      (trace) => trace.locations,
+    );
     if (allLocs.length > 0 && mapRef.current && isFirstUpdateRef.current) {
       // Use [lon, lat] order as requested
       const bounds = L.latLngBounds(allLocs.map((p) => p.latlon));
       mapRef.current.fitBounds(bounds, { padding: [50, 50], animate: false });
       isFirstUpdateRef.current = false;
     }
-  }, [fetches, selectedTags]);
+  }, [throttledFetches, selectedTags]);
 
   return <div ref={mapContainerRef} className="w-full h-full z-0" />;
 };
