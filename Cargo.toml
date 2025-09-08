@@ -31,3 +31,4 @@ actix-web-rust-embed-responder = "2.2.3"
 mime_guess = "2.0.5"
 turso = "0.1.4"
 anyhow = { version = "1.0.99", features = ["backtrace"] }
+clap = { version = "4", features = ["derive"] }

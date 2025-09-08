@@ -1,6 +1,8 @@
 use actix_cors::Cors;
 use actix_web::{App, HttpServer, middleware::Logger, web};
+use clap::Parser;
 use log::info;
+use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tracing_subscriber::{EnvFilter, FmtSubscriber};
@@ -21,6 +23,31 @@ pub use state::State;
 
 pub type AppState = Arc<Mutex<State>>;
 
+/// Command line configuration
+#[derive(Parser, Debug)]
+#[command(author, version, about, long_about = None)]
+struct Config {
+    /// IP address to bind the server to
+    #[arg(long, default_value = "127.0.0.1")]
+    address: String,
+
+    /// Port to bind the server to
+    #[arg(long, default_value_t = 8080)]
+    port: u16,
+
+    /// Path to the password file for user authentication
+    #[arg(long, default_value = "ducktracker.passwd")]
+    password_file: PathBuf,
+
+    /// Path to the SQLite database file
+    #[arg(long, default_value = "ducktracker.db")]
+    database_file: PathBuf,
+
+    /// Default location tag to use for new locations
+    #[arg(long, default_value = "duck")]
+    default_location_tag: String,
+}
+
 /// Main function to set up and run the `actix-web` server.
 #[actix_web::main]
 async fn main() -> anyhow::Result<()> {
@@ -34,11 +61,26 @@ async fn main() -> anyhow::Result<()> {
 
     info!("Initializing");
 
+    // Parse command line arguments
+    let config = Config::parse();
+
+    info!("Configuration: {:?}", config); // Log the parsed configuration
+
     // Create the shared application state.
     let updates = state::Updates::new();
-    let app_state: AppState = Arc::new(Mutex::new(State::new(updates).await?));
+    // NOTE: The `State::new` function in `state.rs` will need to be updated
+    // to accept these new configuration parameters.
+    let app_state: AppState = Arc::new(Mutex::new(
+        State::new(
+            updates,
+            &config.database_file,
+            &config.password_file,
+            &config.default_location_tag,
+        )
+        .await?,
+    ));
 
-    info!("Starting server");
+    info!("Starting server on {}:{}", config.address, config.port);
 
     // Start the HTTP server.
     Ok(HttpServer::new(move || {
@@ -56,7 +98,7 @@ async fn main() -> anyhow::Result<()> {
             .service(handlers::login)
             .service(assets::assets("", "index.html"))
     })
-    .bind(("0.0.0.0", 8080))?
+    .bind((config.address.as_str(), config.port))? // Use parsed address and port
     .run()
     .await?)
 }

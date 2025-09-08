@@ -5,32 +5,38 @@ use crate::models::{FetchId, SessionId, TagsAux};
 use anyhow::{Context as AnyhowContext, Result};
 use chrono::{DateTime, Utc};
 use serde_json;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use turso::{Builder, Database, Row};
 
 /// Client for interacting with the Turso (SQLite) database.
 pub struct DbClient {
     client: Arc<Database>,
-    db_file: String,
+    db_file: PathBuf,
 }
 
 impl DbClient {
     /// Creates a new `DbClient` and initializes the database schema.
-    pub async fn new() -> Result<Self> {
-        let db_file = "ducktracker.db";
+    pub async fn new(db_file: &Path) -> Result<Self> {
         let client = DbClient {
-            client: Arc::new(Builder::new_local(db_file).build().await.with_context(|| {
-                format!(
-                    "Failed to open db (and/or its wal file). File name: {}",
-                    db_file
-                )
-            })?),
-            db_file: db_file.to_string(),
+            client: Arc::new(
+                Builder::new_local(db_file.to_str().ok_or_else(|| {
+                    anyhow::anyhow!("Cannot convert path name to unicode: {:?}", db_file)
+                })?)
+                .build()
+                .await
+                .with_context(|| {
+                    format!(
+                        "Failed to open db (and/or its wal file). File name: {:?}",
+                        db_file
+                    )
+                })?,
+            ),
+            db_file: PathBuf::from(db_file),
         };
-        client
-            .init_db()
-            .await
-            .with_context(|| format!("Failed to init db file {} (and/or its wal file)", db_file))?;
+        client.init_db().await.with_context(|| {
+            format!("Failed to init db file {:?} (and/or its wal file)", db_file)
+        })?;
         Ok(client)
     }
 
@@ -67,7 +73,7 @@ impl DbClient {
         .await
         .with_context(|| {
             format!(
-                "Failed to insert into sessions. File name: {}",
+                "Failed to insert into sessions. File name: {:?}",
                 self.db_file
             )
         })?;
@@ -83,7 +89,7 @@ impl DbClient {
                 (),
             )
             .await
-            .with_context(|| format!("Failed to load sessions. File name: {}", self.db_file))?;
+            .with_context(|| format!("Failed to load sessions. File name: {:?}", self.db_file))?;
         let mut rows = Vec::new();
         while let Some(row) = results.next().await? {
             rows.push(Self::map_row_to_dbsession(row)?);
@@ -118,7 +124,7 @@ impl DbClient {
             (session_id.0.clone(),),
         )
         .await
-        .with_context(|| format!("Failed to delete session. File name: {}", self.db_file))?;
+        .with_context(|| format!("Failed to delete session. File name: {:?}", self.db_file))?;
         Ok(())
     }
 
@@ -130,7 +136,7 @@ impl DbClient {
             (now.to_rfc3339(),),
         )
         .await
-        .with_context(|| format!("Failed to expire sessions. File name: {}", self.db_file))?;
+        .with_context(|| format!("Failed to expire sessions. File name: {:?}", self.db_file))?;
         Ok(())
     }
 }

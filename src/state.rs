@@ -5,6 +5,7 @@ use crate::models::{self, Location, Update, UpdateChange};
 use crate::utils;
 use anyhow::{Context as AnyhowContext, Result as AnyhowResult};
 use chrono::Utc;
+use std::path::Path;
 use std::{collections::HashMap, pin::Pin, sync::Arc};
 use tokio::sync::broadcast; // Use AnyhowResult to differentiate from crate::Error
 use tokio::task;
@@ -20,6 +21,7 @@ pub struct State {
     pub sessions: dashmap::DashMap<models::SessionId, models::Session>,
     pub updates: Updates,
     public_tags: models::Tags,
+    default_tag: models::Tag,
 
     next_fetch_id: models::FetchId,
 
@@ -30,21 +32,30 @@ pub struct State {
 }
 
 impl State {
-    pub async fn new(updates: Updates) -> AnyhowResult<Self> {
-        let password_file = "ducktracker.passwd";
+    pub async fn new(
+        updates: Updates,
+        database_file: &Path,
+        password_file: &Path,
+        default_tag: &str,
+    ) -> AnyhowResult<Self> {
         let users = utils::read_colon_separated_file(password_file)
-            .with_context(|| format!("Failed to open a {}", password_file))?;
+            .with_context(|| format!("Failed to open a {:?}", password_file))?;
 
-        let db_client = Arc::new(DbClient::new().await?); // Initialize DB client
+        let db_client = Arc::new(DbClient::new(&database_file).await?); // Initialize DB client
+
+        let default_tag = models::Tag(default_tag.to_string());
+        let mut public_tags = models::Tags::new();
+        public_tags.0.insert(default_tag.clone());
 
         let mut state = Self {
             updates,
             sessions: dashmap::DashMap::new(),
             next_fetch_id: models::FetchId::default(),
-            public_tags: models::Tags::new(),
+            public_tags,
             users,
             tokens: bounded_set::BoundedSet::new(MAX_TOKENS),
             db_client,
+            default_tag,
         };
 
         state.load_state().await?;
@@ -116,6 +127,14 @@ impl State {
     ) -> models::SessionId {
         let session_id = models::SessionId(utils::generate_id());
         let fetch_id = self.generate_fetch_id();
+        let mut tags_aux = tags_aux;
+
+        if tags_aux.0.is_empty() {
+            tags_aux.0.insert(models::TagAux {
+                name: self.default_tag.clone(),
+                visibility: models::TagVisibility::Public,
+            });
+        }
 
         // Create a new session and store it in the DashMap.
         let new_session = models::Session {
