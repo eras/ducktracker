@@ -128,13 +128,16 @@ pub async fn stream(
         .updates
         .updates(&state, tags.iter().map(|x| x.clone()).collect())
         .await;
-    let events = futures_util::StreamExt::map(updates, |update| {
-        let (_update_context, update) = update.expect("woot, there should have been an update..");
-        let json_data = serde_json::to_string(&update).expect("Failed to encode Update to JSON");
-        Ok::<_, std::convert::Infallible>(actix_web_lab::sse::Event::Data(
-            actix_web_lab::sse::Data::new(json_data),
-        ))
-    });
+    let events = futures_util::StreamExt::map(
+        updates,
+        |update| -> anyhow::Result<actix_web_lab::sse::Event> {
+            let (_update_context, update) = update?;
+            let json_data = serde_json::to_string(&update)?;
+            Ok(actix_web_lab::sse::Event::Data(
+                actix_web_lab::sse::Data::new(json_data),
+            ))
+        },
+    );
 
     Ok(actix_web_lab::sse::Sse::from_stream(events)
         .with_keep_alive(std::time::Duration::from_secs(5)))

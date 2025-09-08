@@ -3,7 +3,7 @@ use crate::db::DbClient;
 use crate::db_models::DbSession;
 use crate::models::{self, Location, Update, UpdateChange};
 use crate::utils;
-use anyhow::Result as AnyhowResult;
+use anyhow::{Context as AnyhowContext, Result as AnyhowResult};
 use chrono::Utc;
 use std::{collections::HashMap, pin::Pin, sync::Arc};
 use tokio::sync::broadcast; // Use AnyhowResult to differentiate from crate::Error
@@ -31,8 +31,9 @@ pub struct State {
 
 impl State {
     pub async fn new(updates: Updates) -> AnyhowResult<Self> {
-        let users = utils::read_colon_separated_file("ducktracker.passwd")
-            .expect("Failed to read ducktracker.passwd");
+        let password_file = "ducktracker.passwd";
+        let users = utils::read_colon_separated_file(password_file)
+            .with_context(|| format!("Failed to open a {}", password_file))?;
 
         let db_client = Arc::new(DbClient::new().await?); // Initialize DB client
 

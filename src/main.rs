@@ -23,8 +23,7 @@ pub type AppState = Arc<Mutex<State>>;
 
 /// Main function to set up and run the `actix-web` server.
 #[actix_web::main]
-async fn main() -> std::io::Result<()> {
-    println!("Starting");
+async fn main() -> anyhow::Result<()> {
     // Set up a subscriber to log messages to the console, forcing them to be unbuffered.
     // This explicitly writes to stdout and should resolve the issue.
     FmtSubscriber::builder()
@@ -33,16 +32,16 @@ async fn main() -> std::io::Result<()> {
         .with_target(true)
         .init();
 
+    info!("Initializing");
+
     // Create the shared application state.
     let updates = state::Updates::new();
-    let app_state: AppState = Arc::new(Mutex::new(
-        State::new(updates).await.expect("Failed to create state"),
-    ));
+    let app_state: AppState = Arc::new(Mutex::new(State::new(updates).await?));
 
-    info!("Starting server at http://127.0.0.1:8080");
+    info!("Starting server");
 
     // Start the HTTP server.
-    HttpServer::new(move || {
+    Ok(HttpServer::new(move || {
         // Configure CORS to allow cross-origin requests from any origin.
         let cors = Cors::permissive();
 
@@ -59,5 +58,5 @@ async fn main() -> std::io::Result<()> {
     })
     .bind(("0.0.0.0", 8080))?
     .run()
-    .await
+    .await?)
 }

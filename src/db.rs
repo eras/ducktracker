@@ -2,7 +2,7 @@
 
 use crate::db_models::DbSession;
 use crate::models::{FetchId, SessionId, TagsAux};
-use anyhow::Result;
+use anyhow::{Context as AnyhowContext, Result};
 use chrono::{DateTime, Utc};
 use serde_json;
 use std::sync::Arc;
@@ -11,15 +11,26 @@ use turso::{Builder, Database, Row};
 /// Client for interacting with the Turso (SQLite) database.
 pub struct DbClient {
     client: Arc<Database>,
+    db_file: String,
 }
 
 impl DbClient {
     /// Creates a new `DbClient` and initializes the database schema.
     pub async fn new() -> Result<Self> {
+        let db_file = "ducktracker.db";
         let client = DbClient {
-            client: Arc::new(Builder::new_local("ducktracker.db").build().await?),
+            client: Arc::new(Builder::new_local(db_file).build().await.with_context(|| {
+                format!(
+                    "Failed to open db (and/or its wal file). File name: {}",
+                    db_file
+                )
+            })?),
+            db_file: db_file.to_string(),
         };
-        client.init_db().await?;
+        client
+            .init_db()
+            .await
+            .with_context(|| format!("Failed to init db file {} (and/or its wal file)", db_file))?;
         Ok(client)
     }
 
@@ -53,7 +64,13 @@ impl DbClient {
                 tags_json,
             ),
         )
-        .await?;
+        .await
+        .with_context(|| {
+            format!(
+                "Failed to insert into sessions. File name: {}",
+                self.db_file
+            )
+        })?;
         Ok(())
     }
 
@@ -65,13 +82,10 @@ impl DbClient {
                 "SELECT session_id, expires_at, fetch_id, tags FROM sessions",
                 (),
             )
-            .await?;
-        let mut rows = Vec::new();
-        while let Some(row) = results
-            .next()
             .await
-            .expect("Failed to read a row from Turso")
-        {
+            .with_context(|| format!("Failed to load sessions. File name: {}", self.db_file))?;
+        let mut rows = Vec::new();
+        while let Some(row) = results.next().await? {
             rows.push(Self::map_row_to_dbsession(row)?);
         }
         Ok(rows)
@@ -85,9 +99,8 @@ impl DbClient {
         let tags_val = row.get::<String>(3)?;
         let session_id = SessionId(session_id_val);
         let expires_at = DateTime::parse_from_rfc3339(&expires_at_val)?.with_timezone(&Utc);
-        let fetch_id = FetchId(u32::try_from(fetch_id_val).unwrap());
-        let tags: TagsAux =
-            serde_json::from_str(&tags_val).expect("Failed to read tags from database");
+        let fetch_id = FetchId(u32::try_from(fetch_id_val)?);
+        let tags: TagsAux = serde_json::from_str(&tags_val)?;
 
         Ok(DbSession {
             session_id,
@@ -104,7 +117,8 @@ impl DbClient {
             "DELETE FROM sessions WHERE session_id = ?",
             (session_id.0.clone(),),
         )
-        .await?;
+        .await
+        .with_context(|| format!("Failed to delete session. File name: {}", self.db_file))?;
         Ok(())
     }
 
@@ -115,7 +129,8 @@ impl DbClient {
             "DELETE FROM sessions WHERE expires_at < ?",
             (now.to_rfc3339(),),
         )
-        .await?;
+        .await
+        .with_context(|| format!("Failed to expire sessions. File name: {}", self.db_file))?;
         Ok(())
     }
 }

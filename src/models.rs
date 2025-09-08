@@ -364,7 +364,9 @@ impl Serialize for TimeUsec {
         let epoch = self
             .0
             .duration_since(std::time::SystemTime::UNIX_EPOCH)
-            .expect("Expected unix time to be available")
+            .map_err(|_system_time_error| {
+                serde::ser::Error::custom("Cannot compute time as Unix epoch")
+            })?
             .as_secs_f64();
 
         serializer.serialize_u64((epoch * 1000000.0) as u64)
