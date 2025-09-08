@@ -46,6 +46,10 @@ class ExpireFetch(BaseModel):
 Change = Literal["reset"] | AddTags | Add | ExpireFetch
 
 
+class LoginResponse(BaseModel):
+    token: str
+
+
 class StreamEvent(BaseModel):
     serverTime: int
     interval: int
@@ -55,6 +59,8 @@ class StreamEvent(BaseModel):
 class HaukApiTest(unittest.TestCase):
     # Base URL with the new .php extension
     BASE_URL = "http://127.0.0.1:8080/api/"
+    TEST_USERNAME = "testuser"
+    TEST_PASSWORD = "testpassword"
 
     def parse_response(self, response: str) -> list[str]:
         lines = response.strip().split("\n")
@@ -62,10 +68,18 @@ class HaukApiTest(unittest.TestCase):
         return lines
 
     def stream_sse(self, tags: list[str]) -> Generator[StreamEvent, None, None]:
+        response = requests.post(
+            f"{self.BASE_URL}login",
+            json={"username": self.TEST_USERNAME, "password": self.TEST_PASSWORD},
+        )
+        token = LoginResponse.model_validate(response.json()).token
+
         headers = {"Accept": "text/event-stream"}
         tags_str = ",".join(tags)
         response = requests.get(
-            f"{self.BASE_URL}stream?tags={tags_str}", stream=True, headers=headers
+            f"{self.BASE_URL}stream?token={token}&tags={tags_str}",
+            stream=True,
+            headers=headers,
         )
         client = sseclient.SSEClient(response)
         return (
@@ -82,8 +96,8 @@ class HaukApiTest(unittest.TestCase):
 
             # Data for the new create.php endpoint
             create_data = {
-                "usr": "testuser",
-                "pwd": "testpassword",
+                "usr": self.TEST_USERNAME,
+                "pwd": self.TEST_PASSWORD,
                 "mod": 0,
                 "lid": tag,
                 "dur": 3600,
@@ -121,8 +135,8 @@ class HaukApiTest(unittest.TestCase):
             tag = f"test_post_and_fetch_location_{random_string()}"
             # Create a session first, using the new endpoint and parsing.
             create_data = {
-                "usr": "testuser",
-                "pwd": "testpassword",
+                "usr": self.TEST_USERNAME,
+                "pwd": self.TEST_PASSWORD,
                 "mod": 0,
                 "lid": tag,
                 "dur": 3600,
@@ -172,8 +186,6 @@ class HaukApiTest(unittest.TestCase):
             self.fail(
                 f"Invalid text response from server. Response text: {response.text}"
             )
-        except Exception as e:
-            self.fail(f"An unexpected error occurred: {e}")
 
 
 if __name__ == "__main__":
