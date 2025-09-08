@@ -5,6 +5,7 @@ use crate::models::{self, Location, Update, UpdateChange};
 use crate::utils;
 use anyhow::{Context as AnyhowContext, Result as AnyhowResult};
 use chrono::{DateTime, Utc};
+use std::collections::VecDeque;
 use std::path::Path;
 use std::{collections::HashMap, pin::Pin, sync::Arc};
 use tokio::sync::broadcast; // Use AnyhowResult to differentiate from crate::Error
@@ -21,7 +22,7 @@ pub enum Error {
 #[derive(Debug, Clone)]
 pub struct Session {
     pub session_id: models::SessionId,
-    pub locations: Vec<Location>,
+    pub locations: VecDeque<Location>,
     pub expires_at: DateTime<Utc>,
     pub fetch_id: models::FetchId,
     pub tags: models::TagsAux,
@@ -42,6 +43,8 @@ pub struct State {
     pub tokens: bounded_set::BoundedSet<String>,
 
     db_client: Arc<DbClient>, // Add the database client
+
+    max_points: usize,
 }
 
 impl State {
@@ -52,6 +55,7 @@ impl State {
         default_tag: &str,
         http_scheme: &str,
         server_name: Option<&str>,
+        max_points: usize,
     ) -> AnyhowResult<Self> {
         let users = utils::read_colon_separated_file(password_file)
             .with_context(|| format!("Failed to open a {:?}", password_file))?;
@@ -73,6 +77,7 @@ impl State {
             default_tag,
             http_scheme: http_scheme.to_string(),
             server_name: server_name.map(|x| x.to_string()),
+            max_points,
         };
 
         state.load_state().await?;
@@ -156,7 +161,7 @@ impl State {
         // Create a new session and store it in the DashMap.
         let new_session = Session {
             session_id: session_id.clone(),
-            locations: Vec::new(),
+            locations: VecDeque::new(),
             expires_at,
             fetch_id: fetch_id.clone(),
             tags: tags_aux.clone().into(),
@@ -222,6 +227,7 @@ impl State {
             changes: [UpdateChange::AddFetch {
                 tags: new_tags,
                 public: public_tags,
+                max_points: self.max_points,
             }]
             .to_vec(),
         };
@@ -235,7 +241,6 @@ impl State {
     }
 
     pub async fn add_location(&mut self, data: &models::PostRequest) -> Result<(), Error> {
-        // Find and get a mutable reference to the session from the DashMap.
         let mut session = match self.sessions.get_mut(&data.session_id) {
             Some(s) => s,
             None => return Err(Error::NoSuchSession),
@@ -258,8 +263,15 @@ impl State {
             time: data.time,
         };
 
-        // Update the last_location field of the session.
-        session.locations.push(new_location.clone());
+        let locs = &mut session.locations;
+        locs.push_back(new_location.clone());
+        if locs.len() > self.max_points {
+            locs.pop_front();
+        }
+
+        // if sessions.locations.len() > state.max_points {
+        //     //sessions.locations.
+        // }
 
         let mut points = std::collections::HashMap::new();
         points.insert(session.fetch_id, [new_location].to_vec());
@@ -327,11 +339,17 @@ impl Updates {
             .sessions
             .iter()
             .filter(|x| (&x.value().tags.as_tags() & &tags).len() > 0)
-            .map(|x| (x.value().fetch_id, x.value().locations.clone()))
+            .map(|x| {
+                (
+                    x.value().fetch_id,
+                    x.value().locations.iter().map(|x| x.clone()).collect(),
+                )
+            })
             .collect();
         changes.push(UpdateChange::AddFetch {
             tags: fetch_tags,
             public: state.public_tags.clone(),
+            max_points: state.max_points,
         });
         changes.push(UpdateChange::Add { points });
         (

@@ -1,5 +1,7 @@
 // src/db_models.rs
 
+use std::collections::VecDeque;
+
 use crate::models::{self, SessionId, TagsAux};
 use crate::state;
 use chrono::{DateTime, Utc};
@@ -33,7 +35,7 @@ impl From<DbSession> for state::Session {
     fn from(db_session: DbSession) -> Self {
         state::Session {
             session_id: db_session.session_id,
-            locations: Vec::new(), // Location data is not persisted
+            locations: VecDeque::new(), // Location data is not persisted
             expires_at: db_session.expires_at,
             fetch_id: db_session.fetch_id,
             tags: db_session.tags,

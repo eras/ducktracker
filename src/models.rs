@@ -432,6 +432,9 @@ pub enum UpdateChange {
 
         // There are these new public tags
         public: Tags,
+
+        // Max number of points the client should persist for this fetch
+        max_points: usize,
     },
     #[serde(rename = "add")]
     Add {
@@ -451,7 +454,11 @@ impl UpdateChange {
     ) -> Option<UpdateChange> {
         match self {
             Self::Reset => Some(self.clone()),
-            Self::AddFetch { tags, public } => {
+            Self::AddFetch {
+                tags,
+                public,
+                max_points,
+            } => {
                 let tags = tags
                     .into_iter()
                     .filter_map(|(fetch_id, tags)| {
@@ -466,6 +473,7 @@ impl UpdateChange {
                 Some(UpdateChange::AddFetch {
                     tags,
                     public: public.clone(),
+                    max_points,
                 })
             }
             Self::Add { points } => {

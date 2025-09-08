@@ -51,7 +51,12 @@ let processUpdates = (
             let fetch =
               fetch_index in state.fetches
                 ? state.fetches[fetch_index]
-                : { locations: [], tags: new Set<string>() };
+                : {
+                    // construct new Fetch
+                    locations: [],
+                    tags: new Set<string>(),
+                    max_points: change.add_fetch.max_points,
+                  };
             fetch.tags = union(fetch.tags, tags);
             for (const tag of tags) {
               newTags.add(tag);
@@ -73,6 +78,12 @@ let processUpdates = (
             let fetch = state.fetches[parseInt(fetch_id)];
             const parsedPoints = points.map(parseLocation);
             fetch.locations = [...fetch.locations, ...parsedPoints];
+            if (fetch.locations.length > fetch.max_points) {
+              fetch.locations.splice(
+                0,
+                fetch.locations.length - fetch.max_points,
+              );
+            }
           }
         });
       } else if ("expire_fetch" in change) {

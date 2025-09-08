@@ -58,6 +58,10 @@ struct Config {
     /// Default tag to assign to shares that don't have any share_id
     #[arg(long, default_value = "duck")]
     default_tag: String,
+
+    /// Maximum number of points a share can have. Mostly for to client peformance purposes.
+    #[arg(long, default_value = "1000")]
+    max_points: usize,
 }
 
 async fn real_main() -> anyhow::Result<()> {
@@ -90,6 +94,7 @@ async fn real_main() -> anyhow::Result<()> {
             &config.default_location_tag,
             &config.scheme,
             config.server_name.as_ref().map(|s| s.as_str()),
+            config.max_points,
         )
         .await?,
     ));
