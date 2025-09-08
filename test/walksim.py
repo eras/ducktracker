@@ -251,6 +251,12 @@ def main() -> None:
         help="Approximate distance to move per interval in meters (default: 50.0).",
     )
     parser.add_argument(
+        "--preload",
+        type=float,
+        default=0,
+        help="If set, first share this many points without sleeping",
+    )
+    parser.add_argument(
         "--username",
         type=str,
         default="testuser",
@@ -274,6 +280,7 @@ def main() -> None:
     move_distance_degrees: float = meters_to_degrees(move_distance_meters)
     username: str = args.username
     password: str = args.password
+    preload: int | None = args.preload if args.preload else None
 
     # Register the SIGINT handler
     signal.signal(signal.SIGINT, signal_handler)
@@ -300,6 +307,8 @@ def main() -> None:
         start_time = time.monotonic()  # Use monotonic for reliable duration measurement
         end_time = start_time + share_duration
 
+        num_points = 0
+
         while not _STOP_SIGNAL_RECEIVED and time.monotonic() < end_time:
             loop_start_time = time.monotonic()
             current_time_unix = int(time.time())
@@ -314,11 +323,14 @@ def main() -> None:
                 base_url, session_id, current_lat, current_lon, current_time_unix
             )
 
-            # Calculate time to sleep to maintain the interval, accounting for execution time
-            elapsed_since_loop_start = time.monotonic() - loop_start_time
-            sleep_duration = share_interval - elapsed_since_loop_start
-            if sleep_duration > 0:
-                time.sleep(sleep_duration)
+            num_points += 1
+
+            if preload is None and num_points > preload:
+                # Calculate time to sleep to maintain the interval, accounting for execution time
+                elapsed_since_loop_start = time.monotonic() - loop_start_time
+                sleep_duration = share_interval - elapsed_since_loop_start
+                if sleep_duration > 0:
+                    time.sleep(sleep_duration)
 
     finally:
         # This block always executes, even if Ctrl+C is pressed or an error occurs.
