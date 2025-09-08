@@ -244,17 +244,7 @@ impl State {
         let now = chrono::Utc::now();
         if session.expires_at < now {
             drop(session);
-            self.sessions.remove(&data.session_id);
-
-            // If session expired, also remove it from the database asynchronously
-            let db_client = self.db_client.clone();
-            let session_id_clone = data.session_id.clone();
-            task::spawn(async move {
-                if let Err(e) = db_client.delete_session(&session_id_clone).await {
-                    eprintln!("Failed to delete expired session from DB: {:?}", e);
-                }
-            });
-
+            self.remove_session(&data.session_id).await;
             return Err(Error::SessionExpired);
         }
 
