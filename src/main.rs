@@ -54,7 +54,9 @@ async fn main() -> anyhow::Result<()> {
     // Set up a subscriber to log messages to the console, forcing them to be unbuffered.
     // This explicitly writes to stdout and should resolve the issue.
     FmtSubscriber::builder()
-        .with_env_filter(EnvFilter::from_default_env())
+        .with_env_filter(
+            EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")),
+        )
         .with_line_number(true)
         .with_target(true)
         .init();
