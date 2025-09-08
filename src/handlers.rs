@@ -25,7 +25,13 @@ pub async fn create_session(
         return HttpResponse::Unauthorized().finish();
     }
 
-    let tags_aux = models::TagsAux::from_share_id(&data.share_id);
+    let tags_aux = match models::TagsAux::from_share_id(&data.share_id) {
+        Ok(x) => x,
+        Err(err) => {
+            return HttpResponse::BadRequest()
+                .body(format!("The format of share id is not permitted: {err}"));
+        }
+    };
 
     // Calculate the expiration time.
     let expires_at = Utc::now() + Duration::seconds(data.duration as i64);

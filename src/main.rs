@@ -54,6 +54,10 @@ struct Config {
     /// Server name used when sharing links to the service (but usually the Origin of Host header is sufficient)
     #[arg(long)]
     server_name: Option<String>,
+
+    /// Default tag to assign to shares that don't have any share_id
+    #[arg(long, default_value = "duck")]
+    default_tag: String,
 }
 
 async fn real_main() -> anyhow::Result<()> {

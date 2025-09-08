@@ -25,6 +25,9 @@ considered private, until the keyword `public:` or `pub:` is seen. So e.g.:
 would result in two shares: `everyone` would be public, while
 `flux-at-the-bar` would be private.
 
+By default, if the share id is left empty in the Hauk mobile client, a
+random private id is generated for the user.
+
 # Compilation
 
 1) `scripts/export-models-types.sh --release` to generate frontend/bindings

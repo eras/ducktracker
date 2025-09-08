@@ -21,7 +21,7 @@ pub struct State {
     pub sessions: dashmap::DashMap<models::SessionId, models::Session>,
     pub updates: Updates,
     public_tags: models::Tags,
-    default_tag: models::Tag,
+    pub default_tag: models::Tag,
 
     pub http_scheme: String,
     pub server_name: Option<String>,

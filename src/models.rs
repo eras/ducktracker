@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use crate::state;
+use crate::{state, utils};
 use chrono::{DateTime, Utc};
 use futures::stream::{self, StreamExt};
 use serde::{Deserialize, Serialize};
@@ -210,8 +210,23 @@ pub struct ShareId(pub String);
 pub struct Tag(pub String);
 
 impl Tag {
-    pub fn new(tag: String) -> Self {
-        Tag(tag)
+    pub fn new(tag: String) -> anyhow::Result<Self> {
+        let trimmed_tag = tag.trim();
+
+        if trimmed_tag.is_empty() {
+            return Err(anyhow::anyhow!("Tag cannot be empty after trimming."));
+        }
+
+        for c in trimmed_tag.chars() {
+            if !c.is_alphanumeric() && c != '-' && c != '_' {
+                return Err(anyhow::anyhow!(
+                    "Tag can only contain unicode alphanumeric characters, dashes, and underscores. Invalid character found: '{}'",
+                    c
+                ));
+            }
+        }
+
+        Ok(Tag(trimmed_tag.to_string()))
     }
 }
 
@@ -232,11 +247,11 @@ pub struct TagAux {
 }
 
 impl TagAux {
-    pub fn new(name: &str, visibility: TagVisibility) -> Self {
-        TagAux {
-            name: Tag::new(name.to_string()),
+    pub fn new(name: &str, visibility: TagVisibility) -> anyhow::Result<Self> {
+        Ok(TagAux {
+            name: Tag::new(name.to_string())?,
             visibility,
-        }
+        })
     }
 
     pub fn as_tag(&self) -> Tag {
@@ -299,9 +314,12 @@ impl Tags {
 }
 
 impl TagsAux {
-    pub fn from_share_id(share_id: &Option<String>) -> Self {
+    pub fn from_share_id(share_id: &Option<String>) -> anyhow::Result<Self> {
         match share_id {
-            None => TagsAux(HashSet::new()), // TODO: in this case, use some configurable default tag
+            None => Ok(TagsAux(
+                std::iter::once(TagAux::new(&utils::generate_id(), TagVisibility::Private)?)
+                    .collect(),
+            )), // TODO: in this case, use some configurable default tag
             Some(share_id) => {
                 let mut tags = HashSet::new();
                 let mut visibility = TagVisibility::Public;
@@ -315,7 +333,7 @@ impl TagsAux {
                         match set_visibility {
                             Some(set_visibility) => {
                                 visibility = set_visibility;
-                                tags.insert(TagAux::new(tag, visibility.clone()));
+                                tags.insert(TagAux::new(tag, visibility.clone())?);
                             }
                             None => {
                                 // Ignore further tags, there was an invalid keyord
@@ -323,10 +341,10 @@ impl TagsAux {
                             }
                         }
                     } else {
-                        tags.insert(TagAux::new(field, visibility.clone()));
+                        tags.insert(TagAux::new(field, visibility.clone())?);
                     }
                 }
-                TagsAux(tags)
+                Ok(TagsAux(tags))
             }
         }
     }
