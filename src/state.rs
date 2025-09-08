@@ -23,6 +23,9 @@ pub struct State {
     public_tags: models::Tags,
     default_tag: models::Tag,
 
+    pub http_scheme: String,
+    pub server_name: Option<String>,
+
     next_fetch_id: models::FetchId,
 
     pub users: HashMap<String, String>, // Key: username, Value:  password (should be hashed)
@@ -37,6 +40,8 @@ impl State {
         database_file: &Path,
         password_file: &Path,
         default_tag: &str,
+        http_scheme: &str,
+        server_name: Option<&str>,
     ) -> AnyhowResult<Self> {
         let users = utils::read_colon_separated_file(password_file)
             .with_context(|| format!("Failed to open a {:?}", password_file))?;
@@ -56,6 +61,8 @@ impl State {
             tokens: bounded_set::BoundedSet::new(MAX_TOKENS),
             db_client,
             default_tag,
+            http_scheme: http_scheme.to_string(),
+            server_name: server_name.map(|x| x.to_string()),
         };
 
         state.load_state().await?;

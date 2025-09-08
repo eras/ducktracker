@@ -55,11 +55,67 @@ const saveSelectedTagsToStorage = (selectedTags: Set<string>) => {
   }
 };
 
+const parseUrl = (url: string): { pub: Set<string>; priv: Set<string> } => {
+  const regex = /(#|&)?pub:([^&]*)(&(?:#|$))?/g;
+  const regex2 = /(#|&)?priv:([^&]*)(&(?:#|$))?/g;
+
+  let match;
+  const pubTags = new Set<string>();
+  while ((match = regex.exec(url)) !== null) {
+    const tag = decodeURIComponent(match[2])
+      .replace(/\s*,\s*/g, ",")
+      .split(",");
+    for (const t of tag) {
+      if (t) pubTags.add(t); // Add check for empty strings
+    }
+  }
+
+  let matchPriv;
+  const privTags = new Set<string>();
+  while ((matchPriv = regex2.exec(url)) !== null) {
+    const tag = decodeURIComponent(matchPriv[2])
+      .replace(/\s*,\s*/g, ",")
+      .split(",");
+    for (const t of tag) {
+      if (t) privTags.add(t); // Add check for empty strings
+    }
+  }
+
+  return { pub: pubTags, priv: privTags };
+};
+
+// --- Global Initialization Logic ---
+const { pub: urlPubTags, priv: urlPrivTags } = parseUrl(window.location.href);
+
+// Get initial values from localStorage
+const initialStoredSelectedTags = getSelectedTags();
+const initialStoredCustomTags = getStoredTags();
+
+// Combine stored tags with URL tags
+const combinedInitialSelectedTags = union(
+  initialStoredSelectedTags,
+  urlPubTags,
+  urlPrivTags,
+);
+const combinedInitialCustomTags = union(initialStoredCustomTags, urlPrivTags);
+
+// Persist the combined initial tags immediately
+saveSelectedTagsToStorage(combinedInitialSelectedTags);
+saveTagsToStorage(combinedInitialCustomTags);
+
+// Initial 'tags' state includes all tags from URL, and custom tags.
+// The protocol store will add its own tags later via subscription.
+const initialTotalTags = union(
+  urlPubTags,
+  urlPrivTags,
+  combinedInitialCustomTags,
+);
+
 export const useAppStore = create<AppState>((set) => ({
-  selectedTags: getSelectedTags(),
+  selectedTags: combinedInitialSelectedTags,
   fetches: {},
-  tags: new Set<string>(),
-  customTags: getStoredTags(),
+  tags: initialTotalTags,
+  customTags: combinedInitialCustomTags,
 
   toggleTag: (tag: string) =>
     set((state) => {
@@ -76,7 +132,7 @@ export const useAppStore = create<AppState>((set) => ({
   addTags: (tags: Set<string>) =>
     set((state) => {
       const newTags = union(state.tags, tags);
-      if (difference(newTags, state.tags).size == 0) {
+      if (difference(newTags, state.tags).size === 0) {
         return {};
       } else {
         return { tags: newTags };
@@ -92,6 +148,8 @@ export const useAppStore = create<AppState>((set) => ({
       const newCustomTags = new Set([...state.customTags, trimmedTag]);
       const newSelectedTags = new Set([...state.selectedTags, trimmedTag]);
       saveTagsToStorage(newCustomTags);
+      // Also update selectedTags if the new custom tag is added
+      saveSelectedTagsToStorage(newSelectedTags);
       return { customTags: newCustomTags, selectedTags: newSelectedTags };
     }),
 
@@ -100,6 +158,8 @@ export const useAppStore = create<AppState>((set) => ({
       const newCustomTags = difference(state.customTags, new Set([tag]));
       const newSelectedTags = difference(state.selectedTags, new Set([tag]));
       saveTagsToStorage(newCustomTags);
+      // Also update selectedTags if the custom tag is removed
+      saveSelectedTagsToStorage(newSelectedTags);
       return { customTags: newCustomTags, selectedTags: newSelectedTags };
     }),
 }));
@@ -117,7 +177,6 @@ useProtocolStore.subscribe((protocolState) => {
 });
 
 // Subscribe to the app store's customTags to re-sync combined tags when they change.
-// The selector function was removed to resolve the TS2554 error.
 useAppStore.subscribe((state, prevState) => {
   // Only update if the custom tags have actually changed
   if (state.customTags !== prevState.customTags) {

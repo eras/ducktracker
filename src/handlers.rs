@@ -4,7 +4,7 @@ use crate::models::{
 };
 use crate::state;
 use crate::utils;
-use actix_web::{HttpResponse, Responder, post, web};
+use actix_web::{HttpRequest, HttpResponse, Responder, post, web};
 use chrono::{Duration, Utc};
 
 /// Handler for the `/api/create` endpoint.
@@ -14,6 +14,7 @@ use chrono::{Duration, Utc};
 pub async fn create_session(
     data: web::Form<CreateRequest>,
     state: web::Data<AppState>,
+    request: HttpRequest,
 ) -> impl Responder {
     let mut state = state.lock().await;
 
@@ -29,15 +30,36 @@ pub async fn create_session(
     // Calculate the expiration time.
     let expires_at = Utc::now() + Duration::seconds(data.duration as i64);
 
+    let share_id = models::ShareId(
+        tags_aux
+            .0
+            .iter()
+            .map(|x| x.to_string())
+            .collect::<Vec<_>>()
+            .join(","),
+    );
+
     let session_id = state.add_session(expires_at, tags_aux).await;
 
-    // Generate a unique share link token.
-    let share_id = models::ShareId(
-        data.share_id
-            .clone()
-            .unwrap_or_else(|| utils::generate_id()),
-    );
-    let share_link = format!("http://127.0.0.1/{share_id}");
+    let base_url = if let Some(server_name) = state.server_name.clone() {
+        format!("{}://{}", state.http_scheme, server_name)
+    } else {
+        request
+            .headers()
+            .get(actix_web::http::header::ORIGIN)
+            .and_then(|v| v.to_str().ok())
+            .map(|s| s.trim_end_matches('/').to_string())
+            .unwrap_or_else(|| {
+                let host = request
+                    .headers()
+                    .get(actix_web::http::header::HOST)
+                    .and_then(|v| v.to_str().ok())
+                    .unwrap_or("127.0.0.1");
+                format!("{}://{}", state.http_scheme, host)
+            })
+    };
+
+    let share_link = format!("{}/#{}", base_url, share_id);
 
     // Construct the response.
     let response = CreateResponse {

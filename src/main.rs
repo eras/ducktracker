@@ -46,6 +46,14 @@ struct Config {
     /// Default location tag to use for new locations
     #[arg(long, default_value = "duck")]
     default_location_tag: String,
+
+    /// Scheme used when sharing links to the service
+    #[arg(long, default_value = "http")]
+    scheme: String,
+
+    /// Server name used when sharing links to the service (but usually the Origin of Host header is sufficient)
+    #[arg(long)]
+    server_name: Option<String>,
 }
 
 async fn real_main() -> anyhow::Result<()> {
@@ -76,6 +84,8 @@ async fn real_main() -> anyhow::Result<()> {
             &config.database_file,
             &config.password_file,
             &config.default_location_tag,
+            &config.scheme,
+            config.server_name.as_ref().map(|s| s.as_str()),
         )
         .await?,
     ));

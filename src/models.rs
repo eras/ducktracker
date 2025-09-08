@@ -246,6 +246,17 @@ impl TagAux {
     pub fn is_public(&self) -> bool {
         self.visibility == TagVisibility::Public
     }
+
+    pub fn to_string(&self) -> String {
+        format!(
+            "{}:{}",
+            match self.visibility {
+                TagVisibility::Public => "pub",
+                TagVisibility::Private => "priv",
+            },
+            self.name
+        )
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

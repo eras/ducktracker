@@ -1,8 +1,13 @@
-export function union<T>(
-  setA: Set<T> | Array<T>,
-  setB: Set<T> | Array<T>,
-): Set<T> {
-  return new Set([...setA, ...setB]);
+export function union<T>(...sets: (Set<T> | Array<T>)[]): Set<T> {
+  const result = new Set<T>();
+
+  for (const set of sets) {
+    for (const item of set) {
+      result.add(item);
+    }
+  }
+
+  return result;
 }
 
 export function intersection<T>(setA: Set<T>, setB: Set<T>): Set<T> {
