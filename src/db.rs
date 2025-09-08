@@ -2,10 +2,9 @@ use crate::db_models::DbSession;
 use crate::models::{FetchId, SessionId, TagsAux};
 use anyhow::{Context as AnyhowContext, Result};
 use chrono::{DateTime, Utc};
-use serde_json;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use turso::{Builder, Connection, Database, Row}; // Added Connection
+use turso::{Builder, Connection, Row}; // Added Connection
 
 /// Client for interacting with the Turso (SQLite) database.
 pub struct DbClient {
@@ -24,8 +23,7 @@ impl DbClient {
             .await
             .with_context(|| {
                 format!(
-                    "Failed to open db (and/or its wal file). File name: {:?}",
-                    db_file
+                    "Failed to open db (and/or its wal file). File name: {db_file:?}"
                 )
             })?,
         );
@@ -38,7 +36,7 @@ impl DbClient {
             db_file: PathBuf::from(db_file),
         };
         client.init_db().await.with_context(|| {
-            format!("Failed to init db file {:?} (and/or its wal file)", db_file)
+            format!("Failed to init db file {db_file:?} (and/or its wal file)")
         })?;
         Ok(client)
     }

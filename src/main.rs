@@ -80,7 +80,7 @@ async fn real_main() -> anyhow::Result<()> {
     // Parse command line arguments
     let config = Config::parse();
 
-    info!("Configuration: {:?}", config); // Log the parsed configuration
+    info!("Configuration: {config:?}"); // Log the parsed configuration
 
     // Create the shared application state.
     let updates = state::Updates::new();
@@ -93,7 +93,7 @@ async fn real_main() -> anyhow::Result<()> {
             &config.password_file,
             &config.default_location_tag,
             &config.scheme,
-            config.server_name.as_ref().map(|s| s.as_str()),
+            config.server_name.as_deref(),
             config.max_points,
         )
         .await?,
@@ -127,7 +127,7 @@ async fn main() -> std::process::ExitCode {
     match real_main().await {
         Ok(()) => std::process::ExitCode::from(0),
         Err(err) => {
-            error!("{}", err.to_string());
+            error!("{err}");
             std::process::ExitCode::from(10)
         }
     }

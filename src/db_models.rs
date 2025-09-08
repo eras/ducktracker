@@ -23,7 +23,7 @@ impl From<&state::Session> for DbSession {
         Self {
             session_id: session.session_id.clone(),
             expires_at: session.expires_at,
-            fetch_id: session.fetch_id.clone(),
+            fetch_id: session.fetch_id,
             tags: session.tags.clone(),
         }
     }

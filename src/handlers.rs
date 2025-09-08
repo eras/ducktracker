@@ -3,7 +3,6 @@ use crate::models::{
     self, CreateRequest, CreateResponse, LoginResponse, PostRequest, PostResponse,
 };
 use crate::state;
-use crate::utils;
 use actix_web::{HttpRequest, HttpResponse, Responder, post, web};
 use chrono::{Duration, Utc};
 
@@ -65,13 +64,13 @@ pub async fn create_session(
             })
     };
 
-    let share_link = format!("{}/#{}", base_url, share_id);
+    let share_link = format!("{base_url}/#{share_id}");
 
     // Construct the response.
     let response = CreateResponse {
         status: "OK".to_string(),
         session_id: session_id.clone(),
-        share_link: share_link,
+        share_link,
         share_id: share_id.clone(),
     };
 
@@ -147,14 +146,14 @@ pub async fn stream(
         //return HttpResponse::Unauthorized().body("Invalid credentials.");
         return Err(actix_web::error::ErrorUnauthorized("Invalid credentials."));
     }
-    let tags = if data.tags.0.len() == 0 {
+    let tags = if data.tags.0.is_empty() {
         state.get_public_tags().0.clone()
     } else {
-        data.tags.0.iter().map(|x| x.clone()).collect()
+        data.tags.0.iter().cloned().collect()
     };
     let updates = state
         .updates
-        .updates(&state, tags.iter().map(|x| x.clone()).collect())
+        .updates(&state, tags.iter().cloned().collect())
         .await;
     let events = futures_util::StreamExt::map(
         updates,

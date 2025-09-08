@@ -1,7 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::{state, utils};
-use chrono::{DateTime, Utc};
 use futures::stream::{self, StreamExt};
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
@@ -57,10 +56,10 @@ pub struct CreateResponse {
 
 impl CreateResponse {
     pub fn to_client(&self) -> String {
-        return format!(
+        format!(
             "{}\n{}\n{}\n{}\n",
             self.status, self.session_id, self.share_link, self.share_id
-        );
+        )
     }
 }
 
@@ -81,7 +80,7 @@ pub struct StopResponse {}
 
 impl StopResponse {
     pub fn to_client(&self) -> String {
-        return format!("OK\n",);
+        "OK\n".to_string()
     }
 }
 
@@ -251,16 +250,19 @@ impl TagAux {
     pub fn is_public(&self) -> bool {
         self.visibility == TagVisibility::Public
     }
+}
 
-    pub fn to_string(&self) -> String {
-        format!(
-            "{}:{}",
+impl std::fmt::Display for TagAux {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
             match self.visibility {
                 TagVisibility::Public => "pub",
                 TagVisibility::Private => "priv",
-            },
-            self.name
-        )
+            }
+        )?;
+        write!(f, "{}", self.name)
     }
 }
 
@@ -273,9 +275,9 @@ impl TagsAux {
     }
 }
 
-impl Into<Tags> for TagsAux {
-    fn into(self) -> Tags {
-        Tags(self.0.into_iter().map(|tag_aux| tag_aux.as_tag()).collect())
+impl From<TagsAux> for Tags {
+    fn from(val: TagsAux) -> Self {
+        Tags(val.0.into_iter().map(|tag_aux| tag_aux.as_tag()).collect())
     }
 }
 
@@ -290,6 +292,12 @@ impl std::ops::BitAnd for &Tags {
 impl FromIterator<Tag> for Tags {
     fn from_iter<T: IntoIterator<Item = Tag>>(iter: T) -> Self {
         Tags(HashSet::from_iter(iter))
+    }
+}
+
+impl Default for Tags {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -411,7 +419,7 @@ impl Update {
             .filter_map(|x| x.filter_map(filter_tags, update_context))
             .collect()
             .await;
-        if changes.len() > 0 {
+        if !changes.is_empty() {
             Some(Update { changes, ..self })
         } else {
             None
@@ -462,7 +470,7 @@ impl UpdateChange {
                 let tags = tags
                     .into_iter()
                     .filter_map(|(fetch_id, tags)| {
-                        let shared_tags = &tags & &filter_tags;
+                        let shared_tags = &tags & filter_tags;
                         if shared_tags.len() > 0 {
                             Some((fetch_id, shared_tags))
                         } else {

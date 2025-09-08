@@ -58,9 +58,9 @@ impl State {
         max_points: usize,
     ) -> AnyhowResult<Self> {
         let users = utils::read_colon_separated_file(password_file)
-            .with_context(|| format!("Failed to open a {:?}", password_file))?;
+            .with_context(|| format!("Failed to open a {password_file:?}"))?;
 
-        let db_client = Arc::new(DbClient::new(&database_file).await?); // Initialize DB client
+        let db_client = Arc::new(DbClient::new(database_file).await?); // Initialize DB client
 
         let default_tag = models::Tag(default_tag.to_string());
         let mut public_tags = models::Tags::new();
@@ -121,7 +121,7 @@ impl State {
     }
 
     pub fn authenticate(&self, user: &str, password: &str) -> bool {
-        self.users.get(user).map_or(false, |p| p == password)
+        self.users.get(user).is_some_and(|p| p == password)
     }
 
     pub fn create_token(&mut self, user: &str, password: &str) -> Option<String> {
@@ -163,8 +163,8 @@ impl State {
             session_id: session_id.clone(),
             locations: VecDeque::new(),
             expires_at,
-            fetch_id: fetch_id.clone(),
-            tags: tags_aux.clone().into(),
+            fetch_id,
+            tags: tags_aux.clone(),
         };
         self.sessions
             .insert(session_id.clone(), new_session.clone());
@@ -175,7 +175,7 @@ impl State {
         let db_session: DbSession = (&new_session).into();
         task::spawn(async move {
             if let Err(e) = db_client.insert_session(&db_session).await {
-                eprintln!("Failed to insert session into DB: {:?}", e);
+                eprintln!("Failed to insert session into DB: {e:?}");
             }
         });
 
@@ -202,7 +202,7 @@ impl State {
             let session_id_clone = session_id.clone();
             task::spawn(async move {
                 if let Err(e) = db_client.delete_session(&session_id_clone).await {
-                    eprintln!("Failed to delete session from DB: {:?}", e);
+                    eprintln!("Failed to delete session from DB: {e:?}");
                 }
             });
         }
@@ -220,7 +220,7 @@ impl State {
 
         let context = UpdateContext { tags: tags.clone() };
         let mut new_tags = HashMap::new();
-        new_tags.insert(fetch_id.clone(), tags);
+        new_tags.insert(fetch_id, tags);
         let update = Update {
             server_time: models::TimeUsec(std::time::SystemTime::now()),
             interval: 0u64,
@@ -235,7 +235,7 @@ impl State {
     }
 
     pub fn generate_fetch_id(&mut self) -> models::FetchId {
-        let id = self.next_fetch_id.clone();
+        let id = self.next_fetch_id;
         self.next_fetch_id.0 += 1;
         id
     }
@@ -307,12 +307,19 @@ pub struct UpdateContext {
     pub tags: models::Tags,
 }
 
+impl Default for Updates {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Updates {
     pub fn new() -> Self {
         let (updates_tx, _updates_rx) = tokio::sync::broadcast::channel(10);
         Self { updates_tx }
     }
 
+    #[allow(clippy::single_match)]
     fn send_update(&self, context: UpdateContext, update: Update) {
         match self.updates_tx.send((context, update)) {
             Ok(_) => (),
@@ -342,7 +349,7 @@ impl Updates {
             .map(|x| {
                 (
                     x.value().fetch_id,
-                    x.value().locations.iter().map(|x| x.clone()).collect(),
+                    x.value().locations.iter().cloned().collect(),
                 )
             })
             .collect();
@@ -369,7 +376,7 @@ impl Updates {
     ) -> Pin<Box<dyn futures_util::stream::Stream<Item = UpdateBroadcast>>> {
         let updates = tokio_stream::wrappers::BroadcastStream::new(self.updates_tx.subscribe());
 
-        let initial_message = self.initial_update(tags.clone(), &state);
+        let initial_message = self.initial_update(tags.clone(), state);
         let first_stream =
             futures_util::stream::once(async move { UpdateBroadcast::Ok(initial_message) });
 
@@ -383,10 +390,10 @@ impl Updates {
                         Ok((context, update)) => {
                             let shared_tags = &context.tags & &subscribed_tags;
                             let shared_context = UpdateContext { tags: shared_tags };
-                            match update.filter_map(&subscribed_tags, &context).await {
-                                None => None,
-                                Some(update) => Some(Ok((shared_context, update))),
-                            }
+                            update
+                                .filter_map(&subscribed_tags, &context)
+                                .await
+                                .map(|update| Ok((shared_context, update)))
                         }
                         Err(_) => Some(x),
                     }
