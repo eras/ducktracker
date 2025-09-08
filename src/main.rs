@@ -51,7 +51,7 @@ struct Config {
     #[arg(long, default_value = "http")]
     scheme: String,
 
-    /// Server name used when sharing links to the service (but usually the Origin of Host header is sufficient)
+    /// Server name used when sharing links to the service (but usually the Origin or Host header is sufficient)
     #[arg(long)]
     server_name: Option<String>,
 
