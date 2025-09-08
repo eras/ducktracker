@@ -1,6 +1,7 @@
 // src/db_models.rs
 
 use crate::models::{self, SessionId, TagsAux};
+use crate::state;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
@@ -14,9 +15,9 @@ pub struct DbSession {
     pub tags: TagsAux,
 }
 
-impl From<&models::Session> for DbSession {
-    /// Converts a `models::Session` reference into a `DbSession`.
-    fn from(session: &models::Session) -> Self {
+impl From<&state::Session> for DbSession {
+    /// Converts a `state::Session` reference into a `DbSession`.
+    fn from(session: &state::Session) -> Self {
         Self {
             session_id: session.session_id.clone(),
             expires_at: session.expires_at,
@@ -26,11 +27,11 @@ impl From<&models::Session> for DbSession {
     }
 }
 
-impl From<DbSession> for models::Session {
-    /// Converts a `DbSession` into a `models::Session`.
+impl From<DbSession> for state::Session {
+    /// Converts a `DbSession` into a `state::Session`.
     /// Note: Location data is not persisted, so `locations` will be empty.
     fn from(db_session: DbSession) -> Self {
-        models::Session {
+        state::Session {
             session_id: db_session.session_id,
             locations: Vec::new(), // Location data is not persisted
             expires_at: db_session.expires_at,

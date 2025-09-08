@@ -4,7 +4,7 @@ use crate::db_models::DbSession;
 use crate::models::{self, Location, Update, UpdateChange};
 use crate::utils;
 use anyhow::{Context as AnyhowContext, Result as AnyhowResult};
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use std::path::Path;
 use std::{collections::HashMap, pin::Pin, sync::Arc};
 use tokio::sync::broadcast; // Use AnyhowResult to differentiate from crate::Error
@@ -17,8 +17,18 @@ pub enum Error {
     SessionExpired,
 }
 
+/// Represents a single tracking session. This data is stored in memory.
+#[derive(Debug, Clone)]
+pub struct Session {
+    pub session_id: models::SessionId,
+    pub locations: Vec<Location>,
+    pub expires_at: DateTime<Utc>,
+    pub fetch_id: models::FetchId,
+    pub tags: models::TagsAux,
+}
+
 pub struct State {
-    pub sessions: dashmap::DashMap<models::SessionId, models::Session>,
+    pub sessions: dashmap::DashMap<models::SessionId, Session>,
     pub updates: Updates,
     public_tags: models::Tags,
     pub default_tag: models::Tag,
@@ -79,7 +89,7 @@ impl State {
         for db_session in db_sessions {
             if db_session.expires_at > now {
                 // Session is still active, re-add it to the in-memory state
-                let session: models::Session = db_session.into();
+                let session: Session = db_session.into();
 
                 // Re-populate public tags from the restored session
                 for tag in session.tags.0.iter() {
@@ -144,7 +154,7 @@ impl State {
         }
 
         // Create a new session and store it in the DashMap.
-        let new_session = models::Session {
+        let new_session = Session {
             session_id: session_id.clone(),
             locations: Vec::new(),
             expires_at,

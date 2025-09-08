@@ -25,16 +25,6 @@ pub struct Location {
 #[allow(dead_code)]
 struct LocationTS([f64; 6]);
 
-/// Represents a single tracking session. This data is stored in memory.
-#[derive(Debug, Clone)]
-pub struct Session {
-    pub session_id: SessionId,
-    pub locations: Vec<Location>,
-    pub expires_at: DateTime<Utc>,
-    pub fetch_id: FetchId,
-    pub tags: TagsAux,
-}
-
 // ========================
 // API Request and Response Models
 // ========================
