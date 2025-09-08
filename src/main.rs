@@ -1,7 +1,7 @@
 use actix_cors::Cors;
 use actix_web::{App, HttpServer, middleware::Logger, web};
 use clap::Parser;
-use log::info;
+use log::{error, info};
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -48,9 +48,7 @@ struct Config {
     default_location_tag: String,
 }
 
-/// Main function to set up and run the `actix-web` server.
-#[actix_web::main]
-async fn main() -> anyhow::Result<()> {
+async fn real_main() -> anyhow::Result<()> {
     // Set up a subscriber to log messages to the console, forcing them to be unbuffered.
     // This explicitly writes to stdout and should resolve the issue.
     FmtSubscriber::builder()
@@ -103,4 +101,15 @@ async fn main() -> anyhow::Result<()> {
     .bind((config.address.as_str(), config.port))? // Use parsed address and port
     .run()
     .await?)
+}
+
+#[actix_web::main]
+async fn main() -> std::process::ExitCode {
+    match real_main().await {
+        Ok(()) => std::process::ExitCode::from(0),
+        Err(err) => {
+            error!("{}", err.to_string());
+            std::process::ExitCode::from(10)
+        }
+    }
 }
