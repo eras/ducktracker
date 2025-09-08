@@ -43,9 +43,9 @@ struct Config {
     #[arg(long, default_value = "ducktracker.db")]
     database_file: PathBuf,
 
-    /// Default location tag to use for new locations
+    /// The public tag that's offered to clients automatically
     #[arg(long, default_value = "duck")]
-    default_location_tag: String,
+    default_public_tag: String,
 
     /// Scheme used when sharing links to the service
     #[arg(long, default_value = "http")]
@@ -91,7 +91,7 @@ async fn real_main() -> anyhow::Result<()> {
             updates,
             &config.database_file,
             &config.password_file,
-            &config.default_location_tag,
+            &config.default_public_tag,
             &config.scheme,
             config.server_name.as_deref(),
             config.max_points,
