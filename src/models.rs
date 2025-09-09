@@ -319,6 +319,7 @@ impl TagsAux {
                     .collect(),
             )), // TODO: in this case, use some configurable default tag
             Some(share_id) => {
+                let share_id: String = share_id.chars().filter(|c| !c.is_whitespace()).collect();
                 let mut tags = HashSet::new();
                 let mut visibility = TagVisibility::Public;
                 for field in share_id.split(",") {
