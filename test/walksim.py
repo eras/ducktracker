@@ -325,7 +325,7 @@ def main() -> None:
 
             num_points += 1
 
-            if preload is None and num_points > preload:
+            if preload is None or num_points > preload:
                 # Calculate time to sleep to maintain the interval, accounting for execution time
                 elapsed_since_loop_start = time.monotonic() - loop_start_time
                 sleep_duration = share_interval - elapsed_since_loop_start
