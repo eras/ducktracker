@@ -1,15 +1,19 @@
-import React, { useEffect } from "react"; // Removed useRef
+import React, { useEffect } from "react";
 import MapComponent from "./components/MapComponent";
 import TagFilter from "./components/TagFilter";
 import LoginOverlay from "./components/LoginOverlay";
+import LocationButton from "./components/LocationButton"; // New import for the button
 import { useProtocolStore } from "./lib/protocol";
 import { useAppStore } from "./hooks/useStore";
 import { useAuthStore } from "./hooks/useAuthStore";
+import { useGeolocation } from "./hooks/useGeolocation"; // New import for the geolocation hook
 
 const App: React.FC = () => {
   const { connect, disconnect } = useProtocolStore();
   const selectedTags = useAppStore((state) => state.selectedTags);
   const { username, password } = useAuthStore(); // username and password trigger re-connection
+
+  useGeolocation(); // Call the geolocation hook here to manage client location
 
   useEffect(() => {
     const establishConnection = async () => {
@@ -31,6 +35,7 @@ const App: React.FC = () => {
       <MapComponent />
       <TagFilter />
       <LoginOverlay />
+      <LocationButton />
     </div>
   );
 };

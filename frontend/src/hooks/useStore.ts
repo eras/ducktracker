@@ -12,10 +12,17 @@ interface AppState {
   toggleTag: (tag: string) => void;
   addCustomTag: (tag: string) => void;
   removeCustomTag: (tag: string) => void;
+
+  showClientLocation: boolean;
+  clientLocation: L.LatLngTuple | null; // Leaflet's LatLngTuple for consistency [latitude, longitude]
+  toggleClientLocation: () => void;
+  setClientLocation: (location: L.LatLngTuple | null) => void;
+  disableClientLocationPersisted: () => void; // Action to disable and persist (e.g., on permission denied)
 }
 
 const CUSTOM_TAGS_KEY = "customTags";
 const SELECTED_TAGS_KEY = "selectedTags";
+const SHOW_CLIENT_LOCATION_KEY = "showClientLocation"; // New localStorage key
 
 // Helper function for localStorage
 const getStoredTags = (): Set<string> => {
@@ -39,6 +46,18 @@ const getSelectedTags = (): Set<string> => {
   }
 };
 
+// New helper function for localStorage
+const getStoredShowClientLocation = (): boolean => {
+  try {
+    const stored = localStorage.getItem(SHOW_CLIENT_LOCATION_KEY);
+    // Default to false if not found or invalid
+    return stored ? JSON.parse(stored) : false;
+  } catch (e) {
+    console.error("Failed to load showClientLocation from localStorage", e);
+    return false;
+  }
+};
+
 const saveTagsToStorage = (tags: Set<string>) => {
   try {
     localStorage.setItem(CUSTOM_TAGS_KEY, JSON.stringify([...tags]));
@@ -52,6 +71,15 @@ const saveSelectedTagsToStorage = (selectedTags: Set<string>) => {
     localStorage.setItem(SELECTED_TAGS_KEY, JSON.stringify([...selectedTags]));
   } catch (e) {
     console.error("Failed to save selected tags to localStorage", e);
+  }
+};
+
+// New helper function to save showClientLocation to localStorage
+const saveShowClientLocationToStorage = (value: boolean) => {
+  try {
+    localStorage.setItem(SHOW_CLIENT_LOCATION_KEY, JSON.stringify(value));
+  } catch (e) {
+    console.error("Failed to save showClientLocation to localStorage", e);
   }
 };
 
@@ -90,6 +118,7 @@ const { pub: urlPubTags, priv: urlPrivTags } = parseUrl(window.location.href);
 // Get initial values from localStorage
 const initialStoredSelectedTags = getSelectedTags();
 const initialStoredCustomTags = getStoredTags();
+const initialStoredShowClientLocation = getStoredShowClientLocation(); // New initial state
 
 // Combine stored tags with URL tags
 const combinedInitialSelectedTags = union(
@@ -116,6 +145,9 @@ export const useAppStore = create<AppState>((set) => ({
   fetches: {},
   tags: initialTotalTags,
   customTags: combinedInitialCustomTags,
+  // --- New client location initial state ---
+  showClientLocation: initialStoredShowClientLocation,
+  clientLocation: null,
 
   toggleTag: (tag: string) =>
     set((state) => {
@@ -161,6 +193,27 @@ export const useAppStore = create<AppState>((set) => ({
       // Also update selectedTags if the custom tag is removed
       saveSelectedTagsToStorage(newSelectedTags);
       return { customTags: newCustomTags, selectedTags: newSelectedTags };
+    }),
+
+  // --- New client location actions ---
+  toggleClientLocation: () =>
+    set((state) => {
+      const newShowLocation = !state.showClientLocation;
+      saveShowClientLocationToStorage(newShowLocation);
+      // If toggling off, clear the location
+      return {
+        showClientLocation: newShowLocation,
+        clientLocation: newShowLocation ? state.clientLocation : null,
+      };
+    }),
+
+  setClientLocation: (location: L.LatLngTuple | null) =>
+    set({ clientLocation: location }),
+
+  disableClientLocationPersisted: () =>
+    set(() => {
+      saveShowClientLocationToStorage(false); // Persist as disabled
+      return { showClientLocation: false, clientLocation: null };
     }),
 }));
 
