@@ -247,8 +247,8 @@ def main() -> None:
     parser.add_argument(
         "--move-distance",
         type=float,
-        default=50.0,  # 50 meters
-        help="Approximate distance to move per interval in meters (default: 50.0).",
+        default=10.0,  # 10 meters
+        help="Approximate distance to move per interval in meters (default: 10.0).",
     )
     parser.add_argument(
         "--preload",
