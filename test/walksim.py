@@ -280,6 +280,12 @@ def main() -> None:
         default=",".join(DEFAULT_PUBLIC_TAGS),
         help="Private tags to select from",
     )
+    parser.add_argument(
+        "--verbose",
+        "-v",
+        action="store_true",
+        help="Enable verbose output",
+    )
 
     args = parser.parse_args()
     base_url = args.endpoint_url
@@ -295,6 +301,7 @@ def main() -> None:
     preload: int | None = args.preload if args.preload else None
     public_tags: list[str] = args.public_tags.split(",")
     private_tags: list[str] = args.private_tags.split(",")
+    verbose: bool = args.verbose
 
     # Register the SIGINT handler
     signal.signal(signal.SIGINT, signal_handler)
@@ -333,6 +340,8 @@ def main() -> None:
             )
 
             # Post the new location update to the server
+            if verbose:
+                print(f"{current_time_unix}")
             post_location_update(
                 base_url, session_id, current_lat, current_lon, current_time_unix
             )
