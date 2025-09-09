@@ -62,6 +62,10 @@ struct Config {
     /// Maximum number of points a share can have. Mostly for to client peformance purposes.
     #[arg(long, default_value = "1000")]
     max_points: usize,
+
+    /// Heart beat interval; changes will be reported to clients latest by this delay, and empty heartbeat messages are sent with this interval
+    #[arg(long, default_value = "1000ms")]
+    update_interval: humantime::Duration,
 }
 
 async fn real_main() -> anyhow::Result<()> {
@@ -79,7 +83,7 @@ async fn real_main() -> anyhow::Result<()> {
 
     info!("Configuration: {config:?}"); // Log the parsed configuration
 
-    let updates = state::Updates::new();
+    let updates = state::Updates::new(config.update_interval.into()).await;
     let app_state: AppState = Arc::new(Mutex::new(
         State::new(
             updates,
@@ -89,6 +93,7 @@ async fn real_main() -> anyhow::Result<()> {
             &config.scheme,
             config.server_name.as_deref(),
             config.max_points,
+            config.update_interval.into(),
         )
         .await?,
     ));

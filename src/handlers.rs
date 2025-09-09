@@ -5,6 +5,7 @@ use crate::models::{
 use crate::state;
 use actix_web::{HttpRequest, HttpResponse, Responder, post, web};
 use chrono::{Duration, Utc};
+use log::{error, info};
 use std::pin::{Pin, pin};
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -142,6 +143,7 @@ pub async fn login(
 
 async fn coalesce_stream(
     events: Box<dyn futures_util::stream::Stream<Item = state::UpdateBroadcast>>,
+    window: std::time::Duration,
 ) -> Pin<Box<dyn futures_util::stream::Stream<Item = state::UpdateBroadcast>>> {
     // 1. Convert the input Box<dyn Stream> into a Pin<Box<dyn Stream>>.
     //    This is necessary to safely poll the stream using `.next().await`.
@@ -152,18 +154,50 @@ async fn coalesce_stream(
     // 2. Use the `stream!` macro to define your custom filtering logic.
     #[rustfmt::skip]
     let filtered_stream = async_stream::stream! {
-        // Loop through the input stream
-        let t_prev = Arc::new(Mutex::new(std::time::SystemTime::now()));
-	const COLLECT_WINDOW_SECONDS: f64 = 1.0;
-        while let Some(item) = pinned_events.as_mut().next().await {
-            // Your filtering logic goes here.
-            // For example, to only pass through items where some condition is true:
-            // if item.should_be_kept() {
-            //    yield item;
-            // }
-
-            // For your original example `|x| async { true }`, this passes all items:
-            yield item;
+        let mut t_prev: Option<f64> = None;
+	let mut accum: Option<state::UpdateWithContext> = None;
+	let mut first = true; // first event goes right through
+	let collect_window_seconds = window.as_secs_f64();
+        while let Some(event) = pinned_events.as_mut().next().await {
+	    match &event {
+		Ok(ok_event) => {
+		    let do_accumulate = if let Some(t_prev) = t_prev {
+			(ok_event.meta.server_time.epoch() - t_prev) < collect_window_seconds
+		    } else {
+			true
+		    };
+		    if first {
+			accum = Some(ok_event.clone())
+		    }
+		    if !first && do_accumulate {
+			accum = Some(match accum {
+			    None => {
+				t_prev = Some(ok_event.meta.server_time.epoch());
+				ok_event.clone()
+			    }
+			    Some(mut prev_accum) => {
+				prev_accum.ingest(ok_event.clone());
+				prev_accum
+			    }
+			})
+		    } else {
+			if let Some(mut prev_accum) = accum {
+			    // Stamp with the current server time
+			    prev_accum.meta.server_time = models::TimeUsec(std::time::SystemTime::now());
+			    yield Ok(prev_accum);
+			    // accum = None;
+			}
+			t_prev = Some(ok_event.meta.server_time.epoch());
+			accum = Some(ok_event.clone())
+		    }
+		    first = false;
+		}
+		Err(err) => {
+		    // ignore. What are these anyway. probably that the broadcast source went away?
+		    // well, that doesn't really happen to us.
+		    error!("wot {err:?}");
+		}
+	    }
         }
     };
 
@@ -191,14 +225,14 @@ pub async fn stream(
         .updates
         .updates(&state, tags.iter().cloned().collect())
         .await;
-    let events = coalesce_stream(Box::new(events)).await;
+    let events = coalesce_stream(Box::new(events), state.update_interval).await;
     // let events = futures_util::StreamExt::filter_map(events, |x| async { Some(x) });
     // let events = futures_util::StreamExt::filter_map(events, |x| async { Some(x) });
     // let events = futures_util::StreamExt::filter(events, |x| async { true });
     let events = futures_util::StreamExt::map(
         events,
         |update| -> anyhow::Result<actix_web_lab::sse::Event> {
-            let (_update_context, update) = update?;
+            let update: models::Update = update?.into();
             let json_data = serde_json::to_string(&update)?;
             Ok(actix_web_lab::sse::Event::Data(
                 actix_web_lab::sse::Data::new(json_data),

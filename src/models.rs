@@ -384,30 +384,37 @@ impl std::fmt::Display for ShareId {
 #[ts(export)]
 pub struct FetchId(pub u32);
 
+impl TimeUsec {
+    pub fn epoch(&self) -> f64 {
+        self.0
+            .duration_since(std::time::SystemTime::UNIX_EPOCH)
+            .expect("Cannot compute time as Unix epoch")
+            .as_secs_f64()
+    }
+}
+
 impl Serialize for TimeUsec {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
     {
-        let epoch = self
-            .0
-            .duration_since(std::time::SystemTime::UNIX_EPOCH)
-            .map_err(|_system_time_error| {
-                serde::ser::Error::custom("Cannot compute time as Unix epoch")
-            })?
-            .as_secs_f64();
-
-        serializer.serialize_u64((epoch * 1000000.0) as u64)
+        serializer.serialize_u64((self.epoch() * 1000000.0) as u64)
     }
 }
 
 #[derive(Debug, Serialize, Clone, TS)]
 #[ts(export)]
 pub struct Update {
+    pub meta: UpdateMeta,
+    pub changes: Vec<UpdateChange>,
+}
+
+#[derive(Debug, Serialize, Clone, TS)]
+#[ts(export)]
+pub struct UpdateMeta {
     #[serde(rename = "serverTime")]
     pub server_time: TimeUsec,
     pub interval: u64,
-    pub changes: Vec<UpdateChange>,
 }
 
 impl Update {
@@ -420,7 +427,7 @@ impl Update {
             .filter_map(|x| x.filter_map(filter_tags, update_context))
             .collect()
             .await;
-        if !changes.is_empty() {
+        if !changes.is_empty() || update_context.is_heartbeat {
             Some(Update { changes, ..self })
         } else {
             None

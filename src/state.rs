@@ -7,6 +7,7 @@ use anyhow::{Context as AnyhowContext, Result as AnyhowResult};
 use chrono::{DateTime, Utc};
 use std::collections::VecDeque;
 use std::path::Path;
+use std::time::Duration;
 use std::{collections::HashMap, pin::Pin, sync::Arc};
 use tokio::sync::broadcast; // Use AnyhowResult to differentiate from crate::Error
 use tokio::task;
@@ -45,6 +46,8 @@ pub struct State {
     db_client: Arc<DbClient>, // Add the database client
 
     max_points: usize,
+
+    pub update_interval: Duration,
 }
 
 impl State {
@@ -56,6 +59,7 @@ impl State {
         http_scheme: &str,
         server_name: Option<&str>,
         max_points: usize,
+        update_interval: Duration,
     ) -> AnyhowResult<Self> {
         let users = utils::read_colon_separated_file(password_file)
             .with_context(|| format!("Failed to open a {password_file:?}"))?;
@@ -78,6 +82,7 @@ impl State {
             http_scheme: http_scheme.to_string(),
             server_name: server_name.map(|x| x.to_string()),
             max_points,
+            update_interval,
         };
 
         state.load_state().await?;
@@ -186,10 +191,14 @@ impl State {
         if let Some((_session_id, session)) = self.sessions.remove(session_id) {
             let context = UpdateContext {
                 tags: session.tags.as_tags(),
+                is_heartbeat: false,
             };
-            let update = Update {
+            let meta = models::UpdateMeta {
                 server_time: models::TimeUsec(std::time::SystemTime::now()),
                 interval: 0u64,
+            };
+            let update = Update {
+                meta,
                 changes: [UpdateChange::ExpireFetch {
                     fetch_id: session.fetch_id,
                 }]
@@ -218,12 +227,18 @@ impl State {
         let public_tags = tags_aux.public_tags();
         let tags: models::Tags = tags_aux.into();
 
-        let context = UpdateContext { tags: tags.clone() };
+        let context = UpdateContext {
+            tags: tags.clone(),
+            is_heartbeat: false,
+        };
         let mut new_tags = HashMap::new();
         new_tags.insert(fetch_id, tags);
-        let update = Update {
+        let meta = models::UpdateMeta {
             server_time: models::TimeUsec(std::time::SystemTime::now()),
             interval: 0u64,
+        };
+        let update = Update {
+            meta,
             changes: [UpdateChange::AddFetch {
                 tags: new_tags,
                 public: public_tags,
@@ -278,11 +293,16 @@ impl State {
 
         let context = UpdateContext {
             tags: session.tags.as_tags().clone(),
+            is_heartbeat: false,
+        };
+
+        let meta = models::UpdateMeta {
+            server_time: models::TimeUsec(std::time::SystemTime::now()),
+            interval: 0u64,
         };
 
         let update = Update {
-            server_time: models::TimeUsec(std::time::SystemTime::now()),
-            interval: 0u64,
+            meta,
             changes: [UpdateChange::Add { points }].to_vec(),
         };
 
@@ -297,7 +317,7 @@ pub struct Updates {
 }
 
 pub type UpdateBroadcast =
-    Result<(UpdateContext, Update), tokio_stream::wrappers::errors::BroadcastStreamRecvError>;
+    Result<UpdateWithContext, tokio_stream::wrappers::errors::BroadcastStreamRecvError>;
 
 // Used to share the context when a particular update was created.
 // E.g. in case of AddPoints it is not known which tags are relevant to a fetch_id,
@@ -305,18 +325,91 @@ pub type UpdateBroadcast =
 #[derive(Debug, Clone)]
 pub struct UpdateContext {
     pub tags: models::Tags,
+    pub is_heartbeat: bool,
 }
 
-impl Default for Updates {
-    fn default() -> Self {
-        Self::new()
+#[derive(Debug, Clone)]
+pub struct UpdateChangeWithContext {
+    pub change: UpdateChange,
+    pub context: UpdateContext,
+}
+
+impl std::convert::Into<UpdateChange> for UpdateChangeWithContext {
+    fn into(self) -> UpdateChange {
+        self.change
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct UpdateWithContext {
+    pub meta: models::UpdateMeta,
+    pub updates: Vec<UpdateChangeWithContext>,
+}
+
+impl UpdateWithContext {
+    pub fn ingest(&mut self, mut other: UpdateWithContext) {
+        self.updates.append(&mut other.updates)
+    }
+}
+
+impl std::convert::From<(UpdateContext, Update)> for UpdateWithContext {
+    fn from(value: (UpdateContext, Update)) -> Self {
+        let context = value.0;
+        let meta = value.1.meta;
+        let changes = value.1.changes;
+        UpdateWithContext {
+            meta,
+            updates: changes
+                .into_iter()
+                .map(|change| UpdateChangeWithContext {
+                    change,
+                    context: context.clone(),
+                })
+                .collect(),
+        }
+    }
+}
+
+impl std::convert::Into<Update> for UpdateWithContext {
+    fn into(self) -> Update {
+        Update {
+            meta: self.meta,
+            changes: self
+                .updates
+                .into_iter()
+                .map(|change| change.change)
+                .collect(),
+        }
     }
 }
 
 impl Updates {
-    pub fn new() -> Self {
+    pub async fn new(update_interval: Duration) -> Self {
         let (updates_tx, _updates_rx) = tokio::sync::broadcast::channel(10);
+        let _ = tokio::task::spawn(Self::update_heartbeat(updates_tx.clone(), update_interval));
         Self { updates_tx }
+    }
+
+    async fn update_heartbeat(
+        updates_tx: broadcast::Sender<(UpdateContext, Update)>,
+        interval: Duration,
+    ) {
+        let context = UpdateContext {
+            tags: models::Tags::new(),
+            is_heartbeat: true,
+        };
+        let interval_seconds = interval.as_secs();
+        loop {
+            let update = models::Update {
+                meta: models::UpdateMeta {
+                    server_time: models::TimeUsec(std::time::SystemTime::now()),
+                    interval: interval_seconds,
+                },
+                changes: vec![],
+            };
+            let _ignore = updates_tx.send((context.clone(), update.clone()));
+            tokio::time::sleep(interval).await;
+        }
     }
 
     #[allow(clippy::single_match)]
@@ -360,10 +453,15 @@ impl Updates {
         });
         changes.push(UpdateChange::Add { points });
         (
-            UpdateContext { tags },
+            UpdateContext {
+                tags,
+                is_heartbeat: false,
+            },
             Update {
-                server_time: models::TimeUsec(std::time::SystemTime::now()),
-                interval: 0u64,
+                meta: models::UpdateMeta {
+                    server_time: models::TimeUsec(std::time::SystemTime::now()),
+                    interval: 0u64,
+                },
                 changes,
             },
         )
@@ -377,11 +475,13 @@ impl Updates {
         let updates = tokio_stream::wrappers::BroadcastStream::new(self.updates_tx.subscribe());
 
         let initial_message = self.initial_update(tags.clone(), state);
-        let first_stream =
-            futures_util::stream::once(async move { UpdateBroadcast::Ok(initial_message) });
+        let first_stream = futures_util::stream::once(async move {
+            UpdateBroadcast::Ok(UpdateWithContext::from(initial_message))
+        });
 
         // Filter our messages this subscription doesn't see
         // Modify tags so that the client doesn't learn about new tags
+        // Also bake the UpdateContext inside each UpdateChange with UpdateChangeWithContext, so it becomes possible to merge with other UpdateChanges
         let updates = {
             futures_util::StreamExt::filter_map(updates, move |x| {
                 let subscribed_tags = tags.clone();
@@ -389,13 +489,20 @@ impl Updates {
                     match x {
                         Ok((context, update)) => {
                             let shared_tags = &context.tags & &subscribed_tags;
-                            let shared_context = UpdateContext { tags: shared_tags };
-                            update
-                                .filter_map(&subscribed_tags, &context)
-                                .await
-                                .map(|update| Ok((shared_context, update)))
+                            let shared_context = UpdateContext {
+                                tags: shared_tags,
+                                ..context
+                            };
+                            let output =
+                                update
+                                    .filter_map(&subscribed_tags, &context)
+                                    .await
+                                    .map(|update| {
+                                        Ok(UpdateWithContext::from((shared_context, update)))
+                                    });
+                            output
                         }
-                        Err(_) => Some(x),
+                        Err(_) => None,
                     }
                 }
             })
