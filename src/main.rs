@@ -65,8 +65,6 @@ struct Config {
 }
 
 async fn real_main() -> anyhow::Result<()> {
-    // Set up a subscriber to log messages to the console, forcing them to be unbuffered.
-    // This explicitly writes to stdout and should resolve the issue.
     FmtSubscriber::builder()
         .with_env_filter(
             EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")),
@@ -77,15 +75,11 @@ async fn real_main() -> anyhow::Result<()> {
 
     info!("Initializing");
 
-    // Parse command line arguments
     let config = Config::parse();
 
     info!("Configuration: {config:?}"); // Log the parsed configuration
 
-    // Create the shared application state.
     let updates = state::Updates::new();
-    // NOTE: The `State::new` function in `state.rs` will need to be updated
-    // to accept these new configuration parameters.
     let app_state: AppState = Arc::new(Mutex::new(
         State::new(
             updates,
