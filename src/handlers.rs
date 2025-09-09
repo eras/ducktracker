@@ -5,6 +5,10 @@ use crate::models::{
 use crate::state;
 use actix_web::{HttpRequest, HttpResponse, Responder, post, web};
 use chrono::{Duration, Utc};
+use std::pin::{Pin, pin};
+use std::sync::Arc;
+use tokio::sync::Mutex;
+use tokio_stream::wrappers::errors::BroadcastStreamRecvError;
 
 /// Handler for the `/api/create` endpoint.
 ///
@@ -136,6 +140,38 @@ pub async fn login(
     }
 }
 
+async fn coalesce_stream(
+    events: Box<dyn futures_util::stream::Stream<Item = state::UpdateBroadcast>>,
+) -> Pin<Box<dyn futures_util::stream::Stream<Item = state::UpdateBroadcast>>> {
+    // 1. Convert the input Box<dyn Stream> into a Pin<Box<dyn Stream>>.
+    //    This is necessary to safely poll the stream using `.next().await`.
+    let mut pinned_events = Box::<dyn futures_util::Stream<Item = Result<_, _>>>::into_pin(events);
+
+    use futures_util::StreamExt;
+
+    // 2. Use the `stream!` macro to define your custom filtering logic.
+    #[rustfmt::skip]
+    let filtered_stream = async_stream::stream! {
+        // Loop through the input stream
+        let t_prev = Arc::new(Mutex::new(std::time::SystemTime::now()));
+	const COLLECT_WINDOW_SECONDS: f64 = 1.0;
+        while let Some(item) = pinned_events.as_mut().next().await {
+            // Your filtering logic goes here.
+            // For example, to only pass through items where some condition is true:
+            // if item.should_be_kept() {
+            //    yield item;
+            // }
+
+            // For your original example `|x| async { true }`, this passes all items:
+            yield item;
+        }
+    };
+
+    // 3. Box and pin the concrete stream returned by the `stream!` macro.
+    //    This ensures the output matches your function's return type signature.
+    Box::pin(filtered_stream)
+}
+
 #[actix_web::get("/api/stream")]
 pub async fn stream(
     data: web::Query<models::StreamRequest>,
@@ -151,12 +187,16 @@ pub async fn stream(
     } else {
         data.tags.0.iter().cloned().collect()
     };
-    let updates = state
+    let events = state
         .updates
         .updates(&state, tags.iter().cloned().collect())
         .await;
+    let events = coalesce_stream(Box::new(events)).await;
+    // let events = futures_util::StreamExt::filter_map(events, |x| async { Some(x) });
+    // let events = futures_util::StreamExt::filter_map(events, |x| async { Some(x) });
+    // let events = futures_util::StreamExt::filter(events, |x| async { true });
     let events = futures_util::StreamExt::map(
-        updates,
+        events,
         |update| -> anyhow::Result<actix_web_lab::sse::Event> {
             let (_update_context, update) = update?;
             let json_data = serde_json::to_string(&update)?;
