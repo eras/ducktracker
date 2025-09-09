@@ -4,11 +4,12 @@ use anyhow::{Context as AnyhowContext, Result};
 use chrono::{DateTime, Utc};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use tokio::sync::Mutex;
 use turso::{Builder, Connection, Row}; // Added Connection
 
 /// Client for interacting with the Turso (SQLite) database.
 pub struct DbClient {
-    conn: Arc<Connection>, // Persist the connection
+    conn: Arc<Mutex<Connection>>, // Persist the connection
     db_file: PathBuf,
 }
 
@@ -22,28 +23,29 @@ impl DbClient {
             .build()
             .await
             .with_context(|| {
-                format!(
-                    "Failed to open db (and/or its wal file). File name: {db_file:?}"
-                )
+                format!("Failed to open db (and/or its wal file). File name: {db_file:?}")
             })?,
         );
 
         // Establish the connection once and persist it
-        let conn = Arc::new(turso_db_client.connect()?);
+        let conn = Arc::new(Mutex::new(turso_db_client.connect()?));
 
         let client = DbClient {
             conn,
             db_file: PathBuf::from(db_file),
         };
-        client.init_db().await.with_context(|| {
-            format!("Failed to init db file {db_file:?} (and/or its wal file)")
-        })?;
+        client
+            .init_db()
+            .await
+            .with_context(|| format!("Failed to init db file {db_file:?} (and/or its wal file)"))?;
         Ok(client)
     }
 
     /// Initializes the `sessions` table if it doesn't already exist.
     async fn init_db(&self) -> Result<()> {
         self.conn
+            .lock()
+            .await
             .execute(
                 "CREATE TABLE IF NOT EXISTS sessions (
                     session_id TEXT PRIMARY KEY,
@@ -61,6 +63,8 @@ impl DbClient {
     pub async fn insert_session(&self, session: &DbSession) -> Result<()> {
         let tags_json = serde_json::to_string(&session.tags)?;
         self.conn
+            .lock()
+            .await
             .execute(
                 "INSERT INTO sessions (session_id, expires_at, fetch_id, tags) VALUES (?, ?, ?, ?)",
                 (
@@ -84,6 +88,8 @@ impl DbClient {
     pub async fn get_all_sessions(&self) -> Result<Vec<DbSession>> {
         let mut results = self
             .conn
+            .lock()
+            .await
             .query(
                 "SELECT session_id, expires_at, fetch_id, tags FROM sessions",
                 (),
@@ -119,6 +125,8 @@ impl DbClient {
     /// Deletes a session from the database by its `SessionId`.
     pub async fn delete_session(&self, session_id: &SessionId) -> Result<()> {
         self.conn
+            .lock()
+            .await
             .execute(
                 "DELETE FROM sessions WHERE session_id = ?",
                 (session_id.0.clone(),),
@@ -131,6 +139,8 @@ impl DbClient {
     /// Deletes all sessions from the database that have expired before the given `now` timestamp.
     pub async fn delete_expired_sessions(&self, now: DateTime<Utc>) -> Result<()> {
         self.conn
+            .lock()
+            .await
             .execute(
                 "DELETE FROM sessions WHERE expires_at < ?",
                 (now.to_rfc3339(),),
