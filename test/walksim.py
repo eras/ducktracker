@@ -13,7 +13,7 @@ from typing import Any, NoReturn, Optional  # Import Optional
 _STOP_SIGNAL_RECEIVED: bool = False
 
 # --- Configuration Constants ---
-PUBLIC_TAGS: list[str] = [
+DEFAULT_PUBLIC_TAGS: list[str] = [
     "public:work",
     "public:home",
     "public:travel",
@@ -21,7 +21,7 @@ PUBLIC_TAGS: list[str] = [
     "public:city",
     "public:street",
 ]
-PRIVATE_TAGS: list[str] = [
+DEFAULT_PRIVATE_TAGS: list[str] = [
     "private:secret",
     "private:personal",
     "private:friends",
@@ -268,6 +268,18 @@ def main() -> None:
         default="testpassword",
         help="Password for authentication (default: 'testpassword').",
     )
+    parser.add_argument(
+        "--public-tags",
+        type=str,
+        default=",".join(DEFAULT_PUBLIC_TAGS),
+        help="Public tags to select from",
+    )
+    parser.add_argument(
+        "--private-tags",
+        type=str,
+        default=",".join(DEFAULT_PUBLIC_TAGS),
+        help="Private tags to select from",
+    )
 
     args = parser.parse_args()
     base_url = args.endpoint_url
@@ -281,6 +293,8 @@ def main() -> None:
     username: str = args.username
     password: str = args.password
     preload: int | None = args.preload if args.preload else None
+    public_tags: list[str] = args.public_tags.split(",")
+    private_tags: list[str] = args.private_tags.split(",")
 
     # Register the SIGINT handler
     signal.signal(signal.SIGINT, signal_handler)
@@ -289,7 +303,7 @@ def main() -> None:
 
     try:
         # 1. Generate random tags for the session
-        selected_tags_str = generate_random_tags(PUBLIC_TAGS, PRIVATE_TAGS)
+        selected_tags_str = generate_random_tags(public_tags, private_tags)
 
         # 2. Create the tracking session
         temp_session_id, _share_link, _share_id = create_session(
