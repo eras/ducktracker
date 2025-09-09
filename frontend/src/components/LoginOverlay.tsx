@@ -56,9 +56,10 @@ const LoginOverlay: React.FC = () => {
             type="text"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
-            onKeyDown={handleUsernameKeyDown} // Add keydown handler
+            onKeyDown={handleUsernameKeyDown}
             placeholder="_ _ _ _ _ _ _ _"
-            className="w-full bg-transparent text-center font-mono text-4xl text-green-400 caret-green-400 placeholder:text-green-400/50 focus:outline-none sm:text-6xl md:text-8xl"
+            // Removed 'text-center' from input, added 'placeholder:text-center'
+            className="w-full bg-transparent font-mono text-4xl text-green-400 caret-green-400 placeholder:text-green-400/50 placeholder:text-center focus:outline-none sm:text-6xl md:text-8xl"
             autoComplete="username"
             required
           />
@@ -73,7 +74,8 @@ const LoginOverlay: React.FC = () => {
             onChange={(e) => setPassword(e.target.value)}
             // Enter key on this input will naturally submit the form due to it being inside <form>
             placeholder="_ _ _ _ _ _ _ _"
-            className="w-full bg-transparent text-center font-mono text-4xl text-green-400 caret-green-400 placeholder:text-green-400/50 focus:outline-none sm:text-6xl md:text-8xl"
+            // Removed 'text-center' from input, added 'placeholder:text-center'
+            className="w-full bg-transparent font-mono text-4xl text-green-400 caret-green-400 placeholder:text-green-400/50 placeholder:text-center focus:outline-none sm:text-6xl md:text-8xl"
             autoComplete="current-password"
             required
           />
