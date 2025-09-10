@@ -16,11 +16,14 @@ default, then it will appear to others when they just select the tag
 (or have no tags selected).  If the share is private, the others will
 need to know to add the "museum" tag to their clients to track it.
 
-To make private tags, configure the `Preferred link ID` in Hauk client
-to have the word `private:` or `priv:`, after which all the links are
-considered private, until the keyword `public:` or `pub:` is seen. So e.g.:
+By default the tags are private. To make a publick share, you need to
+use `pub:` (or `public:`) prefix. So e.g. `pub:museum`. This tag will
+be pushed to all clients, which may then choose to show that as well
+or not.
 
-`everyone,priv:flux-at-the-bar`
+Another example:
+
+`pub:everyone,flux-at-the-bar`
 
 would result in two shares: `everyone` would be public, while
 `flux-at-the-bar` would be private.

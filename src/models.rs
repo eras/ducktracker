@@ -321,26 +321,23 @@ impl TagsAux {
             Some(share_id) => {
                 let share_id: String = share_id.chars().filter(|c| !c.is_whitespace()).collect();
                 let mut tags = HashSet::new();
-                let mut visibility = TagVisibility::Public;
                 for field in share_id.split(",") {
                     if let Some((keyword, tag)) = field.split_once(':') {
-                        let set_visibility = match keyword {
+                        let keyword = match keyword {
                             "pub" | "public" => Some(TagVisibility::Public),
                             "priv" | "private" => Some(TagVisibility::Private),
                             _ => None,
                         };
-                        match set_visibility {
-                            Some(set_visibility) => {
-                                visibility = set_visibility;
-                                tags.insert(TagAux::new(tag, visibility.clone())?);
+                        match keyword {
+                            Some(keyword) => {
+                                tags.insert(TagAux::new(tag, keyword.clone())?);
                             }
                             None => {
-                                // Ignore further tags, there was an invalid keyord
-                                break;
+                                return Err(anyhow::anyhow!("Invalid keyword"));
                             }
                         }
                     } else {
-                        tags.insert(TagAux::new(field, visibility.clone())?);
+                        tags.insert(TagAux::new(field, TagVisibility::Private)?);
                     }
                 }
                 Ok(TagsAux(tags))
