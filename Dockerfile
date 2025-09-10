@@ -35,6 +35,8 @@ COPY src/ src
 COPY --from=node /work/frontend/dist/ frontend/dist
 RUN cargo build ${release_switch}
 RUN cp target/*/ducktracker ducktracker; strip ducktracker
+# Sanity test
+RUN ./ducktracker --help | grep 'Usage'
 
 # Final image
 FROM debian:trixie-slim
