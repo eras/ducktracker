@@ -15,7 +15,7 @@ RUN cargo install cargo-build-deps
 WORKDIR /work
 # Trick to optimize Docker cache usage
 COPY Cargo.toml Cargo.lock ./
-RUN mkdir -p src && echo 'fn main() {}' > src/main.rs
+RUN mkdir -p src && echo 'fn main() { println!("dummy main"); }' > src/main.rs
 RUN cargo build ${release_switch}
 RUN rm -rf src target/*/ducktracker
 # End of trick
