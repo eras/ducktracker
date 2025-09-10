@@ -30,7 +30,7 @@ pub struct Session {
 }
 
 pub struct State {
-    pub sessions: dashmap::DashMap<models::SessionId, Session>,
+    pub sessions: HashMap<models::SessionId, Session>,
     pub updates: Updates,
     public_tags: models::Tags,
     pub default_tag: models::Tag,
@@ -72,7 +72,7 @@ impl State {
 
         let mut state = Self {
             updates,
-            sessions: dashmap::DashMap::new(),
+            sessions: HashMap::new(),
             next_fetch_id: models::FetchId::default(),
             public_tags,
             users,
@@ -188,7 +188,7 @@ impl State {
     }
 
     pub async fn remove_session(&mut self, session_id: &models::SessionId) {
-        if let Some((_session_id, session)) = self.sessions.remove(session_id) {
+        if let Some(session) = self.sessions.remove(session_id) {
             let context = UpdateContext {
                 tags: session.tags.as_tags(),
                 is_heartbeat: false,
@@ -256,14 +256,13 @@ impl State {
     }
 
     pub async fn add_location(&mut self, data: &models::PostRequest) -> Result<(), Error> {
-        let mut session = match self.sessions.get_mut(&data.session_id) {
+        let session = match self.sessions.get_mut(&data.session_id) {
             Some(s) => s,
             None => return Err(Error::NoSuchSession),
         };
 
         let now = chrono::Utc::now();
         if session.expires_at < now {
-            drop(session);
             self.remove_session(&data.session_id).await;
             return Err(Error::SessionExpired);
         }
@@ -426,7 +425,7 @@ impl Updates {
             .sessions
             .iter()
             .filter_map(|x| {
-                let session = &x.value();
+                let session = &x.1;
                 let shared_tags = &session.tags.as_tags() & &tags;
                 if shared_tags.len() > 0 {
                     Some((session.fetch_id, shared_tags))
@@ -438,13 +437,8 @@ impl Updates {
         let points = state
             .sessions
             .iter()
-            .filter(|x| (&x.value().tags.as_tags() & &tags).len() > 0)
-            .map(|x| {
-                (
-                    x.value().fetch_id,
-                    x.value().locations.iter().cloned().collect(),
-                )
-            })
+            .filter(|x| (&x.1.tags.as_tags() & &tags).len() > 0)
+            .map(|x| (x.1.fetch_id, x.1.locations.iter().cloned().collect()))
             .collect();
         changes.push(UpdateChange::AddFetch {
             tags: fetch_tags,
