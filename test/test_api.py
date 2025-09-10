@@ -75,7 +75,13 @@ class HaukApiTest(unittest.TestCase):
         self.assertEqual(lines[0], "OK")
         return lines
 
-    def stream_sse(self, tags: list[str]) -> Generator[StreamEvent, None, None]:
+    def stream_sse(
+        self, tags: list[str], read_timeout: float | None = None
+    ) -> tuple[Generator[StreamEvent, None, None], requests.Response]:
+        """
+        Connects to the SSE stream and returns a generator for events and the raw requests.Response object.
+        The caller is responsible for closing the requests.Response object using its .close() method.
+        """
         response = requests.post(
             f"{self.BASE_URL}login",
             json={"username": self.TEST_USERNAME, "password": self.TEST_PASSWORD},
@@ -84,20 +90,39 @@ class HaukApiTest(unittest.TestCase):
 
         headers = {"Accept": "text/event-stream"}
         tags_str = ",".join(tags)
-        response = requests.get(
+
+        # Set a connect timeout (e.g., 5 seconds) and use the provided read_timeout.
+        # If read_timeout is None, requests defaults to no read timeout.
+        req_timeout = (5, read_timeout) if read_timeout is not None else 5
+
+        # The 'stream=True' is crucial for sseclient to read incrementally
+        raw_sse_response = requests.get(
             f"{self.BASE_URL}stream?token={token}&tags={tags_str}",
             stream=True,
             headers=headers,
+            timeout=req_timeout,
         )
-        client = sseclient.SSEClient(response)
-        return (
-            StreamEvent.model_validate_json(event.data) for event in client.events()
-        )
+
+        deadline = time.monotonic() + read_timeout if read_timeout else None
+
+        def event_generator() -> Generator[StreamEvent, None, None]:
+            client = sseclient.SSEClient(raw_sse_response)
+            for event in client.events():
+                if deadline and time.monotonic() >= deadline:
+                    break
+                parsed = StreamEvent.model_validate_json(event.data)
+                if parsed.changes:
+                    yield parsed
+                else:
+                    break
+
+        return event_generator(), raw_sse_response
 
     def test_create_and_fetch_session(self) -> None:
         """Tests the session creation and basic data retrieval."""
         session_id: str = ""
         response: requests.Response
+        sse_response: requests.Response | None = None  # To ensure cleanup
 
         try:
             tag = f"test_create_and_fetch_session_{random_string()}"
@@ -123,8 +148,8 @@ class HaukApiTest(unittest.TestCase):
             share_id = lines[3]
 
             # 2. Test fetch_location endpoint with the new session ID
-            stream_sse = self.stream_sse([tag])
-            first = next(stream_sse)
+            stream_gen, sse_response = self.stream_sse([tag])
+            first = next(stream_gen)
             self.assertEqual(first.changes[0], "reset")
             self.assertEqual(list(first.changes[1].add_fetch.tags.values()), [[tag]])
             self.assertEqual(list(first.changes[2].add.points.values()), [[]])
@@ -135,10 +160,15 @@ class HaukApiTest(unittest.TestCase):
             self.fail(
                 f"Invalid text response from server. Response text: {response.text}"
             )
+        finally:
+            if sse_response:
+                sse_response.close()
 
     def test_post_and_fetch_location(self) -> None:
         """Tests posting a location and fetching it."""
         session_id: str = ""
+        sse_response: requests.Response | None = None  # To ensure cleanup
+
         try:
             tag = f"test_post_and_fetch_location_{random_string()}"
             # Create a session first, using the new endpoint and parsing.
@@ -180,8 +210,8 @@ class HaukApiTest(unittest.TestCase):
             self.assertEqual(self.parse_response(response.text)[0], "OK")
 
             # 2. Test fetch_location to retrieve the posted data
-            stream_sse = self.stream_sse([tag])
-            first = next(stream_sse)
+            stream_gen, sse_response = self.stream_sse([tag])
+            first = next(stream_gen)
             self.assertEqual(first.changes[0], "reset")
             self.assertEqual(list(first.changes[1].add_fetch.tags.values()), [[tag]])
             points = list(first.changes[2].add.points.values())
@@ -194,6 +224,102 @@ class HaukApiTest(unittest.TestCase):
             self.fail(
                 f"Invalid text response from server. Response text: {response.text}"
             )
+        finally:
+            if sse_response:
+                sse_response.close()
+
+    def test_post_and_fetch_location_no_tag(self) -> None:
+        """
+        Tests posting a location and then trying to fetch it without providing its tag.
+        It expects no relevant SSE events to be received.
+        """
+        session_id: str = ""
+        sse_response: requests.Response | None = None
+
+        try:
+            tag = f"test_post_and_fetch_location_no_tag_{random_string()}"
+            # Create a session first
+            create_data = {
+                "usr": self.TEST_USERNAME,
+                "pwd": self.TEST_PASSWORD,
+                "mod": 0,
+                "lid": tag,
+                "dur": 5,
+                "int": 30,
+            }
+            response = requests.post(f"{self.BASE_URL}create.php", data=create_data)
+            self.assertEqual(response.status_code, 200)
+            lines = self.parse_response(response.text)
+            session_id = lines[1]
+            share_id = lines[3]  # Not directly used but parsed for completeness
+
+            # Post location data associated with the created tag
+            location_data = {
+                "sid": session_id,
+                "lat": 34.0522,
+                "lon": -118.2437,
+                "acc": 10.5,
+                "alt": 500,
+                "speed": 60,
+                "dir": 90,
+                "batt": 75,
+                "prv": 0,
+                "time": int(time.time()),
+            }
+            response = requests.post(f"{self.BASE_URL}post.php", data=location_data)
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(self.parse_response(response.text)[0], "OK")
+
+            # Try to fetch events WITHOUT providing the specific tag, for at most 2 seconds.
+            # We expect no events related to the posted location or session.
+            stream_gen, sse_response = self.stream_sse(
+                [], read_timeout=2
+            )  # Empty list of tags
+            collected_events: list[StreamEvent] = []
+
+            try:
+                # Iterate over the generator. A requests.exceptions.Timeout will be raised
+                # if no data (including keep-alives) is received within the read_timeout period.
+                for event in stream_gen:
+                    collected_events.append(event)
+            except requests.exceptions.Timeout:
+                # This is an expected outcome if the server correctly sends no events
+                # and the connection eventually times out due to inactivity.
+                pass
+            except StopIteration:
+                # The generator finished naturally, e.g., if the server closed the connection.
+                pass
+            except Exception as e:
+                self.fail(f"An unexpected error occurred during SSE streaming: {e}")
+
+            # Assertions: We should not find any AddTags or Add events corresponding to our test tag/session_id
+            found_relevant_changes = False
+            for event in collected_events:
+                for change in event.changes:
+                    if isinstance(change, AddTags):
+                        # Check if this AddTags event contains the tag we just created
+                        for fetch_id_tags in change.add_fetch.tags.values():
+                            if tag in fetch_id_tags:
+                                found_relevant_changes = True
+                                break
+                if found_relevant_changes:
+                    break
+
+            self.assertFalse(
+                found_relevant_changes,
+                f"Found unexpected AddTags or Add events for tag '{tag}' / session '{session_id}' "
+                f"while not subscribed to the tag. Collected events: {collected_events}",
+            )
+
+        except requests.exceptions.RequestException as e:
+            self.fail(f"HTTP request failed: {e}")
+        except (ValueError, IndexError):
+            self.fail(
+                f"Invalid text response from server. Response text: {response.text}"
+            )
+        finally:
+            if sse_response:
+                sse_response.close()  # Ensure the SSE connection is closed
 
 
 if __name__ == "__main__":
