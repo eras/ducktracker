@@ -14,19 +14,19 @@ _STOP_SIGNAL_RECEIVED: bool = False
 
 # --- Configuration Constants ---
 DEFAULT_PUBLIC_TAGS: list[str] = [
-    "public:work",
-    "public:home",
-    "public:travel",
-    "public:park",
-    "public:city",
-    "public:street",
+    "work",
+    "home",
+    "travel",
+    "park",
+    "city",
+    "street",
 ]
 DEFAULT_PRIVATE_TAGS: list[str] = [
-    "private:secret",
-    "private:personal",
-    "private:friends",
-    "private:family",
-    "private:confidential",
+    "secret",
+    "personal",
+    "friends",
+    "family",
+    "confidential",
 ]
 
 # Initial location near Tallinn, Estonia
@@ -71,8 +71,12 @@ def generate_random_tags(
     num_private: int = 1,
 ) -> str:
     """Selects a random number of tags from provided lists and formats them."""
-    selected_public = random.sample(public_tags, min(num_public, len(public_tags)))
-    selected_private = random.sample(private_tags, min(num_private, len(private_tags)))
+    selected_public = random.sample(
+        [f"public:{x}" for x in public_tags], min(num_public, len(public_tags))
+    )
+    selected_private = random.sample(
+        [f"private:{x}" for x in public_tags], min(num_private, len(private_tags))
+    )
     all_selected_tags = selected_public + selected_private
     random.shuffle(all_selected_tags)  # Mix them up
     return ",".join(all_selected_tags)
