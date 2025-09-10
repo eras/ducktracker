@@ -29,14 +29,23 @@ RUN scripts/export-models-types.sh ${release_switch}
 FROM node
 RUN cd frontend; npm run build
 
-# Copy assets from node to rust, so they can be embedded inside the binary, and build binary
 FROM rust as rust-phase2
-COPY src/ src
+# Use another directory, so Docker won't be confused by overwriting files
+RUN mkdir build
+WORKDIR /work
+COPY Cargo.toml Cargo.lock build
+COPY src/ build/src
+WORKDIR /work/build
+# Tried to trick cargo not to rebuild everything, but it didn't stick
+# This whole tomfoolery is because Docker gets confused by overwriting files (such as the dummy main.rs before).
+# ..but it doesn't help.
+RUN cp -r ../target target
+# Copy assets from node to rust, so they can be embedded inside the binary, and build binary
 COPY --from=node /work/frontend/dist/ frontend/dist
 RUN cargo build ${release_switch}
-RUN cp target/*/ducktracker ducktracker; strip ducktracker
+RUN cp target/*/ducktracker /work/ducktracker; strip /work/ducktracker
 # Sanity test
-RUN ./ducktracker --help | grep 'Usage'
+RUN /work/ducktracker --help | grep 'Usage'
 
 # Final image
 FROM debian:trixie-slim
