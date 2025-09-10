@@ -6,9 +6,7 @@ use crate::state;
 use actix_web::{HttpRequest, HttpResponse, Responder, post, web};
 use chrono::{Duration, Utc};
 use log::{error, info};
-use std::pin::{Pin, pin};
-use std::sync::Arc;
-use tokio::sync::Mutex;
+use std::pin::Pin;
 use tokio_stream::wrappers::errors::BroadcastStreamRecvError;
 
 /// Handler for the `/api/create` endpoint.
