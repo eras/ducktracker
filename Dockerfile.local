@@ -1,0 +1,4 @@
+FROM debian:trixie-slim
+WORKDIR /data
+COPY ducktracker /usr/local/bin/ducktracker
+ENTRYPOINT ["/usr/local/bin/ducktracker"]
