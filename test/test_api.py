@@ -397,6 +397,84 @@ class HaukApiTest(unittest.TestCase):
             if sse_response:
                 sse_response.close()
 
+    def test_public_tag_stream_awareness_late_publish(self) -> None:
+        """
+        Tests that a fetch session, started before a public tag is published,
+        becomes aware of that public tag once it is published.
+        """
+        sse_response: requests.Response | None = None
+
+        try:
+            public_tag = f"test_public_tag_late_{random_string()}"
+
+            # 1. Start a fetch session WITHOUT specifying any tags to subscribe to ALL public tags.
+            # Use a long enough read_timeout to allow for tag creation and event propagation.
+            stream_gen, sse_response = self.stream_sse(
+                [], read_timeout=15
+            )  # 15 seconds for this scenario
+
+            collected_events: list[StreamEvent] = []
+            found_public_tag = False
+
+            # 2. Consume any initial 'reset' or other events until we create our tag,
+            # or until the stream eventually times out/closes.
+            # We'll also collect events for debugging if the assertion fails.
+
+            # 3. Publish the public tag after the SSE stream is established.
+            create_data = {
+                "usr": self.TEST_USERNAME,
+                "pwd": self.TEST_PASSWORD,
+                "mod": 0,  # 0 for public tag
+                "lid": f"public:{public_tag}",
+                "dur": 10,
+                "int": 30,
+            }
+            response = requests.post(f"{self.BASE_URL}create.php", data=create_data)
+            self.assertEqual(
+                response.status_code, 200, "Failed to create public tag session."
+            )
+            lines = self.parse_response(response.text)  # Check for OK
+
+            # 4. Wait for and verify the AddTags event on the already-open stream.
+            try:
+                for event in stream_gen:
+                    collected_events.append(event)
+                    for change in event.changes:
+                        if isinstance(change, AddTags):
+                            if public_tag in change.add_fetch.public:
+                                found_public_tag = True
+                                break
+                        if found_public_tag:
+                            break
+                    if found_public_tag:
+                        break
+            except requests.exceptions.Timeout:
+                # Expected if the event doesn't arrive within read_timeout and no other data.
+                pass
+            except StopIteration:
+                # Generator finished naturally (e.g., server closed connection).
+                pass
+            except Exception as e:
+                self.fail(
+                    f"An unexpected error occurred during SSE streaming after tag publish: {e}"
+                )
+
+            self.assertTrue(
+                found_public_tag,
+                f"Fetch session was not aware of public tag '{public_tag}' after it was published. "
+                f"Collected events: {[e.model_dump_json() for e in collected_events]}",
+            )
+
+        except requests.exceptions.RequestException as e:
+            self.fail(f"HTTP request failed: {e}")
+        except (ValueError, IndexError):
+            self.fail(
+                f"Invalid text response from server. Response text: {response.text}"
+            )
+        finally:
+            if sse_response:
+                sse_response.close()
+
 
 if __name__ == "__main__":
     unittest.main()
