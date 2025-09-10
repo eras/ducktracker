@@ -529,6 +529,7 @@ pub struct LoginRequest {
 #[ts(export)]
 pub struct LoginResponse {
     pub token: String,
+    pub version: String,
 }
 
 /// Request body for the /api/stream endpoint.

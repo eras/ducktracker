@@ -164,6 +164,7 @@ export const useProtocolStore = create<ProtocolState>((set) => {
       }
       const result: LoginResponse = await response.json();
       token = result.token;
+      console.log(`ducktracker serevr version ${result.version}`);
     } catch (e) {
       console.error("Pre-flight connection check failed:", e);
       // Decide if you want to show login on network errors too (e.g., server down, network issues)

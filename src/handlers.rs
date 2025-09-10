@@ -133,7 +133,10 @@ pub async fn login(
     let mut state = app_state.lock().await;
 
     if let Some(token) = state.create_token(&data.username, &data.password) {
-        Ok(web::Json(LoginResponse { token }))
+        Ok(web::Json(LoginResponse {
+            token,
+            version: crate::version::VERSION.to_string(),
+        }))
     } else {
         Err(actix_web::error::ErrorUnauthorized("Invalid credentials."))
     }

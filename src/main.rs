@@ -15,6 +15,7 @@ mod handlers;
 mod models;
 mod state;
 mod utils;
+mod version;
 
 // The central, shared application state. We use an Arc to allow multiple
 // worker threads to share the state, and a DashMap for thread-safe
@@ -78,7 +79,7 @@ async fn real_main() -> anyhow::Result<()> {
         .with_target(true)
         .init();
 
-    info!("Initializing");
+    info!("ducktracker {}", crate::version::VERSION);
 
     let config = Config::parse();
 
