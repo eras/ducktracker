@@ -185,7 +185,6 @@ async fn coalesce_stream(
 			    // Stamp with the current server time
 			    prev_accum.meta.server_time = models::TimeUsec(std::time::SystemTime::now());
 			    yield Ok(prev_accum);
-			    // accum = None;
 			}
 			t_prev = Some(ok_event.meta.server_time.epoch());
 			accum = Some(ok_event.clone())
@@ -193,9 +192,25 @@ async fn coalesce_stream(
 		    first = false;
 		}
 		Err(err) => {
-		    // ignore. What are these anyway. probably that the broadcast source went away?
-		    // well, that doesn't really happen to us.
-		    error!("wot {err:?}");
+		    // These happen when we receiver lags too far behind the source. Seems like a very
+		    // severe overload event in the server. Let's just forward these for now.
+
+		    // Proper response would probably be disconnecting the SSE session and let the
+		    // client restart it.
+
+		    match err {
+			BroadcastStreamRecvError::Lagged(lagged_by) => {
+			    error!("Client lagging by {lagged_by} messages")
+			}
+		    }
+
+		    if let Some(mut prev_accum) = accum {
+			prev_accum.meta.server_time = models::TimeUsec(std::time::SystemTime::now());
+			yield Ok(prev_accum);
+			accum = None;
+			t_prev = None;
+		    }
+		    yield event;
 		}
 	    }
         }
