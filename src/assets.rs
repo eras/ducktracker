@@ -34,6 +34,11 @@ async fn embedded_assets_handler(
 pub fn assets(path_prefix: &str, index_file_name: &str) -> Scope {
     let mut scope = web::scope(path_prefix);
 
+    assert!(
+        EmbeddedAssets::get("index.html").is_some(),
+        "index.html not embedded, build process fail"
+    );
+
     let index_data = web::Data::new(index_file_name.to_string());
     scope = scope
         .app_data(index_data)
