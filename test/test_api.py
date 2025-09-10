@@ -38,8 +38,12 @@ class Add(BaseModel):
     add: AddPoints  # Add update
 
 
+class ExpireFetchContent(BaseModel):
+    fetch_id: int  # Fetch_id expired
+
+
 class ExpireFetch(BaseModel):
-    fetch_id: str  # Fetch_id expired
+    expire_fetch: ExpireFetchContent
 
 
 # Reset = Remove everything in client
