@@ -16,35 +16,33 @@ WORKDIR /work
 # Trick to optimize Docker cache usage
 COPY Cargo.toml Cargo.lock build.rs ./
 RUN mkdir -p src && echo 'fn main() { println!("dummy main"); }' > src/main.rs
-RUN cargo build ${release_switch} && rm -rf src target/*/ducktracker
 # End of trick
 
 # Generate frontend/src/bindings
 COPY src/ src
 COPY scripts/ scripts
-RUN scripts/export-models-types.sh ${release_switch}
+RUN scripts/export-models-types.sh ${release_switch} && rm -rf src target
 
 # Generate assets with vite
 FROM node
 RUN cd frontend; npm run build
 
-FROM rust as rust-phase2
+FROM rust:trixie as rust-phase2
 RUN apt-get update && apt install -y git && rm -rf /var/lib/apt/lists/*
 # Use another directory, so Docker won't be confused by overwriting files
-RUN mkdir build
 WORKDIR /work
-COPY Cargo.toml Cargo.lock build.rs build
-COPY src/ build/src
-WORKDIR /work/build
+COPY Cargo.toml Cargo.lock build.rs .
+COPY src/ src
 # Tried to trick cargo not to rebuild everything, but it didn't stick
 # This whole tomfoolery is because Docker gets confused by overwriting files (such as the dummy main.rs before).
 # ..but it doesn't help.
 #RUN cp -r ../target target
 # Copy assets from node to rust, so they can be embedded inside the binary, and build binary
-COPY --from=node /work/frontend/dist/ frontend/dist
+COPY --from=node /work/frontend/dist/ /work/frontend/dist
 COPY .git/ .git
-RUN git describe
-RUN cargo build ${release_switch} && cp target/*/ducktracker /work/ducktracker && strip /work/ducktracker && /work/ducktracker --version | grep 'ducktracker' && rm -rf target
+RUN cd /work/; git describe
+RUN ls -l /work/Cargo.toml /work/src/main.rs
+RUN cd /work/build; cargo build ${release_switch} && cp target/*/ducktracker /work/ducktracker && strip /work/ducktracker && /work/ducktracker --version | grep 'ducktracker' && rm -rf target
 
 # Final image
 FROM debian:trixie-slim
