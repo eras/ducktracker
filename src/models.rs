@@ -179,7 +179,7 @@ struct TimeUsecTS(f64);
 // }
 
 // Given to each new publish session
-#[derive(Debug, Clone, Serialize, Deserialize, Hash, Eq, PartialEq, TS)]
+#[derive(Debug, Clone, Serialize, Deserialize, Hash, Eq, PartialEq, PartialOrd, Ord, TS)]
 #[ts(export)]
 pub struct SessionId(pub String);
 

@@ -135,18 +135,4 @@ impl DbClient {
             .with_context(|| format!("Failed to delete session. File name: {:?}", self.db_file))?;
         Ok(())
     }
-
-    /// Deletes all sessions from the database that have expired before the given `now` timestamp.
-    pub async fn delete_expired_sessions(&self, now: DateTime<Utc>) -> Result<()> {
-        self.conn
-            .lock()
-            .await
-            .execute(
-                "DELETE FROM sessions WHERE expires_at < ?",
-                (now.to_rfc3339(),),
-            )
-            .await
-            .with_context(|| format!("Failed to expire sessions. File name: {:?}", self.db_file))?;
-        Ok(())
-    }
 }

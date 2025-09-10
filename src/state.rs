@@ -5,11 +5,12 @@ use crate::models::{self, Location, Update, UpdateChange};
 use crate::utils;
 use anyhow::{Context as AnyhowContext, Result as AnyhowResult};
 use chrono::{DateTime, Utc};
-use std::collections::VecDeque;
+use std::cmp::Reverse;
+use std::collections::{BinaryHeap, VecDeque};
 use std::path::Path;
 use std::time::Duration;
 use std::{collections::HashMap, pin::Pin, sync::Arc};
-use tokio::sync::broadcast; // Use AnyhowResult to differentiate from crate::Error
+use tokio::sync::{Mutex, Notify, broadcast};
 use tokio::task;
 
 const MAX_TOKENS: usize = 100000;
@@ -30,7 +31,10 @@ pub struct Session {
 }
 
 pub struct State {
-    pub sessions: HashMap<models::SessionId, Session>,
+    sessions: HashMap<models::SessionId, Session>,
+    session_added: Arc<Notify>,
+    expirations: BinaryHeap<Reverse<(DateTime<Utc>, models::SessionId)>>,
+
     pub updates: Updates,
     public_tags: models::Tags,
     pub default_tag: models::Tag,
@@ -60,7 +64,7 @@ impl State {
         server_name: Option<&str>,
         max_points: usize,
         update_interval: Duration,
-    ) -> AnyhowResult<Self> {
+    ) -> AnyhowResult<Arc<Mutex<Self>>> {
         let users = utils::read_colon_separated_file(password_file)
             .with_context(|| format!("Failed to open a {password_file:?}"))?;
 
@@ -73,6 +77,8 @@ impl State {
         let mut state = Self {
             updates,
             sessions: HashMap::new(),
+            session_added: Arc::new(Notify::new()),
+            expirations: BinaryHeap::new(),
             next_fetch_id: models::FetchId::default(),
             public_tags,
             users,
@@ -87,7 +93,11 @@ impl State {
 
         state.load_state().await?;
 
-        Ok(state)
+        let arc_state = Arc::new(Mutex::new(state));
+
+        tokio::spawn(Self::remove_expired_sessions_task(arc_state.clone()));
+
+        Ok(arc_state)
     }
 
     async fn load_state(&mut self) -> AnyhowResult<()> {
@@ -113,7 +123,12 @@ impl State {
                     highest_fetch_id = session.fetch_id.0;
                 }
 
+                self.expirations.push(Reverse((
+                    session.expires_at.clone(),
+                    session.session_id.clone(),
+                )));
                 self.sessions.insert(session.session_id.clone(), session);
+                self.session_added.notify_waiters();
             } else {
                 // Session has expired, remove it from the database
                 self.db_client
@@ -149,7 +164,7 @@ impl State {
 
     pub async fn add_session(
         &mut self,
-        expires_at: chrono::DateTime<Utc>,
+        expires_at: DateTime<Utc>,
         tags_aux: models::TagsAux,
     ) -> models::SessionId {
         let session_id = models::SessionId(utils::generate_id());
@@ -171,8 +186,13 @@ impl State {
             fetch_id,
             tags: tags_aux.clone(),
         };
+        self.expirations.push(Reverse((
+            new_session.expires_at.clone(),
+            new_session.session_id.clone(),
+        )));
         self.sessions
             .insert(session_id.clone(), new_session.clone());
+        self.session_added.notify_waiters();
         self.add_fetch(fetch_id, tags_aux).await;
 
         // Persist the new session to the database asynchronously
@@ -187,7 +207,67 @@ impl State {
         session_id
     }
 
+    async fn remove_expired_sessions_task(state: Arc<Mutex<State>>) {
+        let session_added = state.lock().await.session_added.clone();
+        loop {
+            let next_sleep_duration;
+            {
+                let mut state = state.lock().await;
+
+                state.remove_expired_sessions().await;
+
+                if let Some(Reverse((expires_at, _))) = state.expirations.peek() {
+                    let now = Utc::now();
+
+                    next_sleep_duration = expires_at
+                        .signed_duration_since(now)
+                        .to_std()
+                        // Handle the extremely unlikely error case reasonably?
+                        .unwrap_or(Duration::from_secs(1));
+                } else {
+                    next_sleep_duration = Duration::from_secs(3600);
+                }
+            }
+
+            log::debug!("Sleeping for {next_sleep_duration:?}");
+
+            #[rustfmt::skip]
+            tokio::select! {
+		_ = tokio::time::sleep(next_sleep_duration) => {
+                    // Sleep finished, loop to re-process expired sessions
+		}
+		_ = session_added.notified() => {
+		    // A new session was added/updated that might be earlier, or an existing
+		    // earliest session was removed. Re-loop immediately to re-evaluate the next
+		    // sleep time.
+		}
+            }
+        }
+    }
+
+    async fn remove_expired_sessions(&mut self) {
+        let now = Utc::now();
+        loop {
+            if let Some(Reverse((expires_at, session_id))) = self.expirations.peek() {
+                if expires_at <= &now {
+                    let session_id = session_id.clone();
+                    self.expirations.pop();
+                    if self.sessions.contains_key(&session_id) {
+                        log::debug!("Removing expired session {session_id}");
+                        self.remove_session(&session_id).await;
+                    }
+                } else {
+                    break;
+                }
+            } else {
+                break;
+            }
+        }
+    }
+
     pub async fn remove_session(&mut self, session_id: &models::SessionId) {
+        // we let the entry in self.expirations remain, it dose no harm as we never*
+        // give out duplicate session ids
         if let Some(session) = self.sessions.remove(session_id) {
             let context = UpdateContext {
                 tags: session.tags.as_tags(),
@@ -261,7 +341,7 @@ impl State {
             None => return Err(Error::NoSuchSession),
         };
 
-        let now = chrono::Utc::now();
+        let now = Utc::now();
         if session.expires_at < now {
             self.remove_session(&data.session_id).await;
             return Err(Error::SessionExpired);

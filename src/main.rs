@@ -84,19 +84,17 @@ async fn real_main() -> anyhow::Result<()> {
     info!("Configuration: {config:?}"); // Log the parsed configuration
 
     let updates = state::Updates::new(config.update_interval.into()).await;
-    let app_state: AppState = Arc::new(Mutex::new(
-        State::new(
-            updates,
-            &config.database_file,
-            &config.password_file,
-            &config.default_public_tag,
-            &config.scheme,
-            config.server_name.as_deref(),
-            config.max_points,
-            config.update_interval.into(),
-        )
-        .await?,
-    ));
+    let app_state: AppState = State::new(
+        updates,
+        &config.database_file,
+        &config.password_file,
+        &config.default_public_tag,
+        &config.scheme,
+        config.server_name.as_deref(),
+        config.max_points,
+        config.update_interval.into(),
+    )
+    .await?;
 
     info!("Starting server on {}:{}", config.address, config.port);
 
