@@ -38,6 +38,6 @@ RUN cp target/*/ducktracker ducktracker; strip ducktracker
 
 # Final image
 FROM debian:trixie-slim
-WORKDIR /app
+WORKDIR /data
 COPY --from=rust-phase2 /work/ducktracker /usr/local/bin/ducktracker
 ENTRYPOINT ["/usr/local/bin/ducktracker"]
