@@ -40,9 +40,8 @@ COPY src/ src
 # Copy assets from node to rust, so they can be embedded inside the binary, and build binary
 COPY --from=node /work/frontend/dist/ /work/frontend/dist
 COPY .git/ .git
-RUN cd /work/; git describe
-RUN ls -l /work/Cargo.toml /work/src/main.rs
-RUN cd /work/build; cargo build ${release_switch} && cp target/*/ducktracker /work/ducktracker && strip /work/ducktracker && /work/ducktracker --version | grep 'ducktracker' && rm -rf target
+RUN git describe
+RUN cargo build ${release_switch} && cp target/*/ducktracker /work/ducktracker && strip /work/ducktracker && /work/ducktracker --version | grep 'ducktracker' && rm -rf target
 
 # Final image
 FROM debian:trixie-slim
