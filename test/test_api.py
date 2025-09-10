@@ -321,6 +321,82 @@ class HaukApiTest(unittest.TestCase):
             if sse_response:
                 sse_response.close()  # Ensure the SSE connection is closed
 
+    def test_public_tag_stream_awareness(self) -> None:
+        """
+        Tests that a fetch session subscribed to public tags becomes aware of a newly
+        published public tag stream.
+        """
+        session_id: str = ""
+        sse_response: requests.Response | None = None
+
+        try:
+            # 1. Create a session with a PUBLIC tag
+            public_tag = f"test_public_tag_{random_string()}"
+            create_data = {
+                "usr": self.TEST_USERNAME,
+                "pwd": self.TEST_PASSWORD,
+                "mod": 0,  # 0 for public tag
+                "lid": f"public:{public_tag}",
+                "dur": 3600,
+                "int": 30,
+            }
+            response = requests.post(f"{self.BASE_URL}create.php", data=create_data)
+            self.assertEqual(response.status_code, 200)
+            lines = self.parse_response(response.text)
+            session_id = lines[1]
+            # No need to post location data for this test, as we only care about the tag's existence.
+
+            # 2. Start a fetch session WITHOUT specifying any tags to subscribe to ALL public tags
+            stream_gen, sse_response = self.stream_sse(
+                [], read_timeout=5
+            )  # Empty list subscribes to public tags
+
+            # The initial 'reset' event should contain the public tag information
+            first_event: StreamEvent | None = None
+            try:
+                first_event = next(stream_gen)
+            except StopIteration:
+                self.fail(
+                    "SSE stream ended prematurely before receiving initial event."
+                )
+            except requests.exceptions.Timeout:
+                self.fail("SSE stream timed out before receiving initial event.")
+
+            self.assertIsNotNone(first_event, "Did not receive any initial SSE event.")
+            self.assertEqual(
+                first_event.changes[0], "reset", "First change was not 'reset'"
+            )
+
+            # 3. Assert that the fetch session is aware of the new public tag
+            found_public_tag = False
+            for change in first_event.changes:
+                if isinstance(change, AddTags):
+                    # Check if the public_tag is present in the general tags list for any fetch_id
+                    for fetch_id_tags in change.add_fetch.tags.values():
+                        if public_tag in fetch_id_tags:
+                            # And specifically if it's marked as a public tag for that fetch_id
+                            if public_tag in change.add_fetch.public:
+                                found_public_tag = True
+                                break
+                if found_public_tag:
+                    break
+
+            self.assertTrue(
+                found_public_tag,
+                f"Fetch session was not aware of public tag '{public_tag}' in initial events. "
+                f"Collected events: {first_event}",
+            )
+
+        except requests.exceptions.RequestException as e:
+            self.fail(f"HTTP request failed: {e}")
+        except (ValueError, IndexError):
+            self.fail(
+                f"Invalid text response from server. Response text: {response.text}"
+            )
+        finally:
+            if sse_response:
+                sse_response.close()
+
 
 if __name__ == "__main__":
     unittest.main()
