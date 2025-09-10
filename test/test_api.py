@@ -50,9 +50,13 @@ class LoginResponse(BaseModel):
     token: str
 
 
-class StreamEvent(BaseModel):
+class Meta(BaseModel):
     serverTime: int
     interval: int
+
+
+class StreamEvent(BaseModel):
+    meta: Meta
     changes: list[Change]
 
 
