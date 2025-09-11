@@ -1,4 +1,5 @@
 FROM debian:trixie-slim
 WORKDIR /data
+RUN apt update && apt install -y tzdata && apt clean
 COPY ducktracker /usr/local/bin/ducktracker
 ENTRYPOINT ["/usr/local/bin/ducktracker"]
