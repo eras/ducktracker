@@ -7,7 +7,7 @@ fn main() {
     // It's usually fine to just run it on every build.
 
     let output = Command::new("git")
-        .args(&["describe", "--tags", "--always", "--broken"])
+        .args(["describe", "--tags", "--always", "--broken"])
         .current_dir(env!("CARGO_MANIFEST_DIR")) // Run git in the project root
         .output()
         .expect("Failed to execute git command");
@@ -23,5 +23,5 @@ fn main() {
         "unknown".to_string()
     };
 
-    println!("cargo:rustc-env=GIT_TAG={}", git_tag);
+    println!("cargo:rustc-env=GIT_TAG={git_tag}");
 }

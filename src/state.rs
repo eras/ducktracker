@@ -128,10 +128,8 @@ impl State {
                     highest_fetch_id = session.fetch_id.0;
                 }
 
-                self.expirations.push(Reverse((
-                    session.expires_at.clone(),
-                    session.session_id.clone(),
-                )));
+                self.expirations
+                    .push(Reverse((session.expires_at, session.session_id.clone())));
                 self.sessions.insert(session.session_id.clone(), session);
                 self.session_added.notify_waiters();
             } else {
@@ -192,7 +190,7 @@ impl State {
             tags: tags_aux.clone(),
         };
         self.expirations.push(Reverse((
-            new_session.expires_at.clone(),
+            new_session.expires_at,
             new_session.session_id.clone(),
         )));
         self.sessions
@@ -426,9 +424,9 @@ pub struct UpdateChangeWithContext {
     pub context: UpdateContext,
 }
 
-impl std::convert::Into<UpdateChange> for UpdateChangeWithContext {
-    fn into(self) -> UpdateChange {
-        self.change
+impl std::convert::From<UpdateChangeWithContext> for UpdateChange {
+    fn from(val: UpdateChangeWithContext) -> Self {
+        val.change
     }
 }
 
@@ -462,11 +460,11 @@ impl std::convert::From<(UpdateContext, Update)> for UpdateWithContext {
     }
 }
 
-impl std::convert::Into<Update> for UpdateWithContext {
-    fn into(self) -> Update {
+impl std::convert::From<UpdateWithContext> for Update {
+    fn from(val: UpdateWithContext) -> Self {
         Update {
-            meta: self.meta,
-            changes: self
+            meta: val.meta,
+            changes: val
                 .updates
                 .into_iter()
                 .map(|change| change.change)
@@ -580,14 +578,11 @@ impl Updates {
                                 tags: shared_tags,
                                 ..context
                             };
-                            let output =
-                                update
-                                    .filter_map(&subscribed_tags, &context)
-                                    .await
-                                    .map(|update| {
-                                        Ok(UpdateWithContext::from((shared_context, update)))
-                                    });
-                            output
+
+                            update
+                                .filter_map(&subscribed_tags, &context)
+                                .await
+                                .map(|update| Ok(UpdateWithContext::from((shared_context, update))))
                         }
                         Err(_) => None,
                     }

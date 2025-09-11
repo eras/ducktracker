@@ -5,7 +5,7 @@ use crate::models::{
 use crate::state;
 use actix_web::{HttpRequest, HttpResponse, Responder, post, web};
 use chrono::{Duration, Utc};
-use log::{error, info};
+use log::error;
 use std::pin::Pin;
 use tokio_stream::wrappers::errors::BroadcastStreamRecvError;
 
