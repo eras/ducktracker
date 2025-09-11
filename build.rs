@@ -7,7 +7,7 @@ fn main() {
     // It's usually fine to just run it on every build.
 
     let output = Command::new("git")
-        .args(["describe", "--tags", "--always", "--broken"])
+        .args(["describe", "--tags", "--always"])
         .current_dir(env!("CARGO_MANIFEST_DIR")) // Run git in the project root
         .output()
         .expect("Failed to execute git command");
