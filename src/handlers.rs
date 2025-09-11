@@ -229,7 +229,6 @@ pub async fn stream(
 ) -> actix_web::Result<impl Responder> {
     let state = app_state.lock().await;
     if !state.check_token(&data.token) {
-        //return HttpResponse::Unauthorized().body("Invalid credentials.");
         return Err(actix_web::error::ErrorUnauthorized("Invalid credentials."));
     }
     let tags = if data.tags.0.is_empty() {
@@ -242,9 +241,7 @@ pub async fn stream(
         .updates(&state, tags.iter().cloned().collect())
         .await;
     let events = coalesce_stream(Box::new(events), state.update_interval).await;
-    // let events = futures_util::StreamExt::filter_map(events, |x| async { Some(x) });
-    // let events = futures_util::StreamExt::filter_map(events, |x| async { Some(x) });
-    // let events = futures_util::StreamExt::filter(events, |x| async { true });
+
     let events = futures_util::StreamExt::map(
         events,
         |update| -> anyhow::Result<actix_web_lab::sse::Event> {
