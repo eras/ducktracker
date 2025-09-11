@@ -4,3 +4,13 @@
 /frontend/dist
 /test/.venv
 /frontend/src/bindings
+llm
+local-scripts
+.llm-context
+data
+ducktracker
+ducktracker.db
+ducktracker.db-wal
+ducktracker.passwd
+.emacs.desktop
+.emacs.desktop.lock
