@@ -128,6 +128,7 @@ async fn real_main() -> anyhow::Result<()> {
         App::new()
             .wrap(Logger::default())
             .wrap(cors)
+            .wrap(actix_web::middleware::Compress::default())
             .app_data(web::Data::new(app_state.clone()))
             .service(handlers::create_session)
             .service(handlers::stop_session)
