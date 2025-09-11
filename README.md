@@ -70,3 +70,15 @@ for ease of use.)
 If there are no tags selected, then all public tags will be shown. If
 any of the tags is selected, then the selected tags function as a
 filter.
+
+# Privacy
+
+## The --box-coords -feature
+
+As a particular privacy feature, or testing feature, one can start the
+server with `--box-coords lat1,lng1,lat2,lng2`, e.g. `--box-coords
+59.432465,24.744732,59.441459,24.762416`. This will wrap the input
+data to be in that box before further processing. This way no clients
+can get the original coordinates. Do note though that with some data
+analysis and guesswork it may still be possible to recover the origin
+data.

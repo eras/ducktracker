@@ -1,5 +1,6 @@
 use actix_cors::Cors;
 use actix_web::{App, HttpServer, middleware::Logger, web};
+use anyhow::Context;
 use clap::Parser;
 use log::{error, info};
 use std::path::PathBuf;
@@ -9,6 +10,7 @@ use tracing_subscriber::{EnvFilter, FmtSubscriber};
 
 mod assets;
 mod bounded_set;
+mod box_coords;
 mod db;
 mod db_models;
 mod handlers;
@@ -21,6 +23,8 @@ mod version;
 // worker threads to share the state, and a DashMap for thread-safe
 // concurrent access to the session data.
 pub use state::State;
+
+pub use box_coords::BoxCoords;
 
 pub type AppState = Arc<Mutex<State>>;
 
@@ -67,6 +71,10 @@ struct Config {
     /// Heart beat interval; changes will be reported to clients latest by this delay, and empty heartbeat messages are sent with this interval
     #[arg(long, default_value = "1000ms")]
     update_interval: humantime::Duration,
+
+    /// Bounding box for wrapping coordinates, format: "lat1,lng1,lat2,lng2"
+    #[arg(long)]
+    box_coords: Option<String>,
 }
 
 async fn real_main() -> anyhow::Result<()> {
@@ -85,6 +93,17 @@ async fn real_main() -> anyhow::Result<()> {
 
     info!("Configuration: {config:?}"); // Log the parsed configuration
 
+    // Parse box_coords if provided
+    let parsed_box_coords: Option<BoxCoords> = if let Some(box_str) = &config.box_coords {
+        Some(
+            box_str
+                .parse::<BoxCoords>()
+                .context("Failed to parse --box coordinates")?,
+        )
+    } else {
+        None
+    };
+
     let updates = state::Updates::new(config.update_interval.into()).await;
     let app_state: AppState = State::new(
         updates,
@@ -95,6 +114,7 @@ async fn real_main() -> anyhow::Result<()> {
         config.server_name.as_deref(),
         config.max_points,
         config.update_interval.into(),
+        parsed_box_coords, // PASS THE PARSED BOX COORDINATES
     )
     .await?;
 

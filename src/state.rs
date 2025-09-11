@@ -1,4 +1,5 @@
 use crate::bounded_set;
+use crate::box_coords::BoxCoords;
 use crate::db::DbClient;
 use crate::db_models::DbSession;
 use crate::models::{self, Location, Update, UpdateChange};
@@ -52,6 +53,8 @@ pub struct State {
     max_points: usize,
 
     pub update_interval: Duration,
+
+    pub box_coords: Option<BoxCoords>,
 }
 
 impl State {
@@ -64,6 +67,7 @@ impl State {
         server_name: Option<&str>,
         max_points: usize,
         update_interval: Duration,
+        box_coords: Option<BoxCoords>,
     ) -> AnyhowResult<Arc<Mutex<Self>>> {
         let users = utils::read_colon_separated_file(password_file)
             .with_context(|| format!("Failed to open a {password_file:?}"))?;
@@ -89,6 +93,7 @@ impl State {
             server_name: server_name.map(|x| x.to_string()),
             max_points,
             update_interval,
+            box_coords,
         };
 
         state.load_state().await?;
@@ -347,15 +352,23 @@ impl State {
             return Err(Error::SessionExpired);
         }
 
+        // Apply coordinate wrapping if box_coords are configured
+        let (mut latitude, mut longitude) = (data.latitude, data.longitude);
+        if let Some(box_c) = self.box_coords {
+            latitude = box_c.wrap_latitude(latitude);
+            longitude = box_c.wrap_longitude(longitude);
+        }
+
         // Create a new Location struct with the provided data.
         let new_location = Location {
-            lat: data.latitude,
-            lon: data.longitude,
+            lat: latitude,  // Use potentially wrapped latitude
+            lon: longitude, // Use potentially wrapped longitude
             acc: data.accuracy,
             spd: data.speed,
             provider: data.provider.unwrap_or(0),
             time: data.time,
         };
+        let _ = data; // prevent accidentally accessing any fields in data
 
         let locs = &mut session.locations;
         locs.push_back(new_location.clone());
