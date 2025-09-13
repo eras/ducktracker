@@ -256,13 +256,13 @@ impl std::fmt::Display for TagAux {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "{}",
+            "{}:{}",
             match self.visibility {
                 TagVisibility::Public => "pub",
                 TagVisibility::Private => "priv",
-            }
-        )?;
-        write!(f, "{}", self.name)
+            },
+            self.name
+        )
     }
 }
 
