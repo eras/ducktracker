@@ -1,12 +1,15 @@
-use crate::AppState;
 use crate::models::{
     self, CreateRequest, CreateResponse, LoginResponse, PostRequest, PostResponse,
 };
-use crate::state;
+use crate::{AppState, prometheus, state};
 use actix_web::{HttpRequest, HttpResponse, Responder, post, web};
+use actix_web_httpauth::extractors::basic::BasicAuth;
 use chrono::{Duration, Utc};
 use log::error;
 use std::pin::Pin;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::Instant;
 use tokio_stream::wrappers::errors::BroadcastStreamRecvError;
 
 /// Handler for the `/api/create` endpoint.
@@ -145,6 +148,7 @@ pub async fn login(
 async fn coalesce_stream(
     events: Box<dyn futures_util::stream::Stream<Item = state::UpdateBroadcast>>,
     window: std::time::Duration,
+    sse_counter: Arc<AtomicU64>,
 ) -> Pin<Box<dyn futures_util::stream::Stream<Item = state::UpdateBroadcast>>> {
     // 1. Convert the input Box<dyn Stream> into a Pin<Box<dyn Stream>>.
     //    This is necessary to safely poll the stream using `.next().await`.
@@ -155,6 +159,8 @@ async fn coalesce_stream(
     // 2. Use the `stream!` macro to define your custom filtering logic.
     #[rustfmt::skip]
     let filtered_stream = async_stream::stream! {
+	// Used for keeping the number of sessions up during this stream
+	let _sse_session_counter = crate::session_counter::SessionCounter::new(sse_counter);
         let mut t_prev: Option<f64> = None;
 	let mut accum: Option<state::UpdateWithContext> = None;
 	let mut first = true; // first event goes right through
@@ -226,6 +232,7 @@ async fn coalesce_stream(
 pub async fn stream(
     data: web::Query<models::StreamRequest>,
     app_state: web::Data<AppState>,
+    sse_counter: web::Data<Arc<AtomicU64>>,
 ) -> actix_web::Result<impl Responder> {
     let state = app_state.lock().await;
     if !state.check_token(&data.token) {
@@ -240,7 +247,12 @@ pub async fn stream(
         .updates
         .updates(&state, tags.iter().cloned().collect())
         .await;
-    let events = coalesce_stream(Box::new(events), state.update_interval).await;
+    let events = coalesce_stream(
+        Box::new(events),
+        state.update_interval,
+        (**sse_counter).clone(),
+    )
+    .await;
 
     let events = futures_util::StreamExt::map(
         events,
@@ -255,4 +267,37 @@ pub async fn stream(
 
     Ok(actix_web_lab::sse::Sse::from_stream(events)
         .with_keep_alive(std::time::Duration::from_secs(5)))
+}
+
+#[actix_web::get("/metrics")]
+pub async fn prometheus_metrics(
+    app_state: web::Data<AppState>,
+    sse_counter: web::Data<Arc<AtomicU64>>,
+    start_time: web::Data<Instant>,
+    auth: BasicAuth,
+) -> impl Responder {
+    let state = app_state.lock().await;
+
+    // Check for Prometheus authentication credentials
+    let prometheus_user = state.prometheus_user.clone();
+    let prometheus_password = state.prometheus_password.clone();
+
+    let authenticated = match (prometheus_user, prometheus_password) {
+        (Some(user), Some(pass)) => {
+            auth.user_id() == user && auth.password().map_or(false, |p| p == pass)
+        }
+        // No credentials configured, endpoint is disabled
+        _ => false,
+    };
+
+    if !authenticated {
+        return HttpResponse::Unauthorized().finish();
+    }
+
+    let metrics =
+        prometheus::generate_metrics(&state, sse_counter.load(Ordering::SeqCst), &start_time);
+
+    HttpResponse::Ok()
+        .content_type("text/plain; version=0.0.4")
+        .body(metrics)
 }

@@ -37,7 +37,7 @@ pub struct State {
     expirations: BinaryHeap<Reverse<(DateTime<Utc>, models::SessionId)>>,
 
     pub updates: Updates,
-    public_tags: models::Tags,
+    pub public_tags: models::Tags, // Make `public_tags` public
     pub default_tag: models::Tag,
 
     pub http_scheme: String,
@@ -47,6 +47,10 @@ pub struct State {
 
     pub users: HashMap<String, String>, // Key: username, Value:  password (should be hashed)
     pub tokens: bounded_set::BoundedSet<String>,
+
+    // Prometheus authentication
+    pub prometheus_user: Option<String>,
+    pub prometheus_password: Option<String>,
 
     db_client: Arc<DbClient>, // Add the database client
 
@@ -58,6 +62,7 @@ pub struct State {
 }
 
 impl State {
+    #[allow(clippy::too_many_arguments)]
     pub async fn new(
         updates: Updates,
         database_file: &Path,
@@ -68,6 +73,8 @@ impl State {
         max_points: usize,
         update_interval: Duration,
         box_coords: Option<BoxCoords>,
+        prometheus_user: Option<String>,
+        prometheus_password: Option<String>,
     ) -> AnyhowResult<Arc<Mutex<Self>>> {
         let users = utils::read_colon_separated_file(password_file)
             .with_context(|| format!("Failed to open a {password_file:?}"))?;
@@ -94,6 +101,8 @@ impl State {
             max_points,
             update_interval,
             box_coords,
+            prometheus_user,
+            prometheus_password,
         };
 
         state.load_state().await?;
@@ -103,6 +112,14 @@ impl State {
         tokio::spawn(Self::remove_expired_sessions_task(arc_state.clone()));
 
         Ok(arc_state)
+    }
+
+    pub fn iter_sessions(&self) -> impl Iterator<Item = &Session> {
+        self.sessions.values()
+    }
+
+    pub fn num_sessions(&self) -> usize {
+        self.sessions.len()
     }
 
     async fn load_state(&mut self) -> AnyhowResult<()> {

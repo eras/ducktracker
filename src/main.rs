@@ -5,6 +5,7 @@ use clap::Parser;
 use log::{error, info};
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::sync::atomic::AtomicU64;
 use tokio::sync::Mutex;
 use tracing_subscriber::{EnvFilter, FmtSubscriber};
 
@@ -15,6 +16,8 @@ mod db;
 mod db_models;
 mod handlers;
 mod models;
+mod prometheus; // Add this module
+mod session_counter;
 mod state;
 mod utils;
 mod version;
@@ -75,6 +78,14 @@ struct Config {
     /// Bounding box for wrapping coordinates, format: "lat1,lng1,lat2,lng2"
     #[arg(long)]
     box_coords: Option<String>,
+
+    /// Username for Prometheus metrics endpoint
+    #[arg(long)]
+    prometheus_user: Option<String>,
+
+    /// Password for Prometheus metrics endpoint
+    #[arg(long)]
+    prometheus_password: Option<String>,
 }
 
 async fn real_main() -> anyhow::Result<()> {
@@ -104,6 +115,10 @@ async fn real_main() -> anyhow::Result<()> {
         None
     };
 
+    // Shared data for metrics
+    let start_time = std::time::Instant::now();
+    let sse_counter = Arc::new(AtomicU64::new(0));
+
     let updates = state::Updates::new(config.update_interval.into()).await;
     let app_state: AppState = State::new(
         updates,
@@ -115,6 +130,8 @@ async fn real_main() -> anyhow::Result<()> {
         config.max_points,
         config.update_interval.into(),
         parsed_box_coords, // PASS THE PARSED BOX COORDINATES
+        config.prometheus_user,
+        config.prometheus_password,
     )
     .await?;
 
@@ -130,11 +147,14 @@ async fn real_main() -> anyhow::Result<()> {
             .wrap(cors)
             .wrap(actix_web::middleware::Compress::default())
             .app_data(web::Data::new(app_state.clone()))
+            .app_data(web::Data::new(sse_counter.clone()))
+            .app_data(web::Data::new(start_time))
             .service(handlers::create_session)
             .service(handlers::stop_session)
             .service(handlers::post_location)
             .service(handlers::stream)
             .service(handlers::login)
+            .service(handlers::prometheus_metrics)
             .service(assets::assets("", "index.html"))
     })
     .bind((config.address.as_str(), config.port))? // Use parsed address and port
