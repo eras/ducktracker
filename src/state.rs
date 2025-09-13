@@ -569,10 +569,19 @@ impl Updates {
         )
     }
 
+    pub fn update_subscribed_tags(update: &Update, subscribed_tags: &mut models::Tags) {
+        for change in update.changes.iter() {
+            if let models::UpdateChange::AddFetch { public, .. } = change {
+                subscribed_tags.merge(public);
+            }
+        }
+    }
+
     pub async fn updates(
         &self,
         state: &State,
         tags: models::Tags,
+        auto_subscribe: bool, // automatically subscribe to new public tags
     ) -> Pin<Box<dyn futures_util::stream::Stream<Item = UpdateBroadcast>>> {
         let updates = tokio_stream::wrappers::BroadcastStream::new(self.updates_tx.subscribe());
 
@@ -581,15 +590,22 @@ impl Updates {
             UpdateBroadcast::Ok(UpdateWithContext::from(initial_message))
         });
 
+        let subscribed_tags = Arc::new(Mutex::new(tags));
+
         // Filter our messages this subscription doesn't see
         // Modify tags so that the client doesn't learn about new tags
         // Also bake the UpdateContext inside each UpdateChange with UpdateChangeWithContext, so it becomes possible to merge with other UpdateChanges
         let updates = {
             futures_util::StreamExt::filter_map(updates, move |x| {
-                let subscribed_tags = tags.clone();
+                let subscribed_tags = subscribed_tags.clone();
                 async move {
                     match x {
                         Ok((context, update)) => {
+                            let mut subscribed_tags = subscribed_tags.lock().await;
+                            if auto_subscribe {
+                                Self::update_subscribed_tags(&update, &mut subscribed_tags);
+                            }
+
                             let shared_tags = &context.tags & &subscribed_tags;
                             let shared_context = UpdateContext {
                                 tags: shared_tags,

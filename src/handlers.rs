@@ -238,14 +238,14 @@ pub async fn stream(
     if !state.check_token(&data.token) {
         return Err(actix_web::error::ErrorUnauthorized("Invalid credentials."));
     }
-    let tags = if data.tags.0.is_empty() {
-        state.get_public_tags().0.clone()
+    let (auto_subscribe, tags) = if data.tags.0.is_empty() {
+        (true, state.get_public_tags().0.clone())
     } else {
-        data.tags.0.iter().cloned().collect()
+        (false, data.tags.0.iter().cloned().collect())
     };
     let events = state
         .updates
-        .updates(&state, tags.iter().cloned().collect())
+        .updates(&state, tags.iter().cloned().collect(), auto_subscribe)
         .await;
     let events = coalesce_stream(
         Box::new(events),

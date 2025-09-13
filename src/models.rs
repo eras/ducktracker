@@ -309,6 +309,14 @@ impl Tags {
     pub fn len(&self) -> usize {
         self.0.len()
     }
+
+    pub fn merge(&mut self, tags: &Self) {
+        for tag in tags.0.iter() {
+            if !self.0.contains(tag) {
+                self.0.insert(tag.clone());
+            }
+        }
+    }
 }
 
 impl TagsAux {
