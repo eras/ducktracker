@@ -2,66 +2,17 @@
 
 import unittest
 import requests
-import json
 import time
-import typing
 import sseclient
 import random
 import string
 
-from pydantic import BaseModel, RootModel
-from typing import Any, Literal, Generator, TypeAlias
+from typing import Generator
+from . import dt_types
 
 
 def random_string() -> str:
     return "".join(random.choices(string.ascii_letters + string.digits, k=4))
-
-
-class AddTagsTags(BaseModel):
-    tags: dict[str, list[str]]  # Set of tags (in general) published by a fetch_id
-    public: set[str]  # Public tags published by a fetch_id
-
-
-class AddTags(BaseModel):
-    add_fetch: AddTagsTags  # tags added by this add tags update
-
-
-# lat, lon, time (epoch in micros), speed, accuracy, GPS source (0 or 1)
-Point: TypeAlias = tuple[float, float, float, float | None, float | None, float]
-
-
-class AddPoints(BaseModel):
-    points: dict[str, list[Point]]  # points added by this add points update
-
-
-class Add(BaseModel):
-    add: AddPoints  # Add update
-
-
-class ExpireFetchContent(BaseModel):
-    fetch_id: int  # Fetch_id expired
-
-
-class ExpireFetch(BaseModel):
-    expire_fetch: ExpireFetchContent
-
-
-# Reset = Remove everything in client
-Change = Literal["reset"] | AddTags | Add | ExpireFetch
-
-
-class LoginResponse(BaseModel):
-    token: str
-
-
-class Meta(BaseModel):
-    serverTime: int
-    interval: int
-
-
-class StreamEvent(BaseModel):
-    meta: Meta
-    changes: list[Change]
 
 
 class HaukApiTest(unittest.TestCase):
@@ -77,7 +28,7 @@ class HaukApiTest(unittest.TestCase):
 
     def stream_sse(
         self, tags: list[str], read_timeout: float | None = None
-    ) -> tuple[Generator[StreamEvent, None, None], requests.Response]:
+    ) -> tuple[Generator[dt_types.StreamEvent, None, None], requests.Response]:
         """
         Connects to the SSE stream and returns a generator for events and the raw requests.Response object.
         The caller is responsible for closing the requests.Response object using its .close() method.
@@ -86,7 +37,7 @@ class HaukApiTest(unittest.TestCase):
             f"{self.BASE_URL}login",
             json={"username": self.TEST_USERNAME, "password": self.TEST_PASSWORD},
         )
-        token = LoginResponse.model_validate(response.json()).token
+        token = dt_types.LoginResponse.model_validate(response.json()).token
 
         headers = {"Accept": "text/event-stream"}
         tags_str = ",".join(tags)
@@ -105,12 +56,12 @@ class HaukApiTest(unittest.TestCase):
 
         deadline = time.monotonic() + read_timeout if read_timeout else None
 
-        def event_generator() -> Generator[StreamEvent, None, None]:
+        def event_generator() -> Generator[dt_types.StreamEvent, None, None]:
             client = sseclient.SSEClient(raw_sse_response)
             for event in client.events():
                 if deadline and time.monotonic() >= deadline:
                     break
-                parsed = StreamEvent.model_validate_json(event.data)
+                parsed = dt_types.StreamEvent.model_validate_json(event.data)
                 if parsed.changes:
                     yield parsed
                 else:
@@ -275,7 +226,7 @@ class HaukApiTest(unittest.TestCase):
             stream_gen, sse_response = self.stream_sse(
                 [], read_timeout=2
             )  # Empty list of tags
-            collected_events: list[StreamEvent] = []
+            collected_events: list[dt_types.StreamEvent] = []
 
             try:
                 # Iterate over the generator. A requests.exceptions.Timeout will be raised
@@ -292,12 +243,12 @@ class HaukApiTest(unittest.TestCase):
             except Exception as e:
                 self.fail(f"An unexpected error occurred during SSE streaming: {e}")
 
-            # Assertions: We should not find any AddTags or Add events corresponding to our test tag/session_id
+            # Assertions: We should not find any dt_types.AddTags or Add events corresponding to our test tag/session_id
             found_relevant_changes = False
             for event in collected_events:
                 for change in event.changes:
-                    if isinstance(change, AddTags):
-                        # Check if this AddTags event contains the tag we just created
+                    if isinstance(change, dt_types.AddTags):
+                        # Check if this dt_types.AddTags event contains the tag we just created
                         for fetch_id_tags in change.add_fetch.tags.values():
                             if tag in fetch_id_tags:
                                 found_relevant_changes = True
@@ -307,7 +258,7 @@ class HaukApiTest(unittest.TestCase):
 
             self.assertFalse(
                 found_relevant_changes,
-                f"Found unexpected AddTags or Add events for tag '{tag}' / session '{session_id}' "
+                f"Found unexpected dt_types.AddTags or Add events for tag '{tag}' / session '{session_id}' "
                 f"while not subscribed to the tag. Collected events: {collected_events}",
             )
 
@@ -352,7 +303,7 @@ class HaukApiTest(unittest.TestCase):
             )  # Empty list subscribes to public tags
 
             # The initial 'reset' event should contain the public tag information
-            first_event: StreamEvent | None = None
+            first_event: dt_types.StreamEvent | None = None
             try:
                 first_event = next(stream_gen)
             except StopIteration:
@@ -370,7 +321,7 @@ class HaukApiTest(unittest.TestCase):
             # 3. Assert that the fetch session is aware of the new public tag
             found_public_tag = False
             for change in first_event.changes:
-                if isinstance(change, AddTags):
+                if isinstance(change, dt_types.AddTags):
                     # Check if the public_tag is present in the general tags list for any fetch_id
                     for fetch_id_tags in change.add_fetch.tags.values():
                         if public_tag in fetch_id_tags:
@@ -413,7 +364,7 @@ class HaukApiTest(unittest.TestCase):
                 [], read_timeout=15
             )  # 15 seconds for this scenario
 
-            collected_events: list[StreamEvent] = []
+            collected_events: list[dt_types.StreamEvent] = []
             found_public_tag = False
 
             # 2. Consume any initial 'reset' or other events until we create our tag,
@@ -435,12 +386,12 @@ class HaukApiTest(unittest.TestCase):
             )
             lines = self.parse_response(response.text)  # Check for OK
 
-            # 4. Wait for and verify the AddTags event on the already-open stream.
+            # 4. Wait for and verify the dt_types.AddTags event on the already-open stream.
             try:
                 for event in stream_gen:
                     collected_events.append(event)
                     for change in event.changes:
-                        if isinstance(change, AddTags):
+                        if isinstance(change, dt_types.AddTags):
                             if public_tag in change.add_fetch.public:
                                 found_public_tag = True
                                 break
