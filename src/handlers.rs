@@ -23,11 +23,25 @@ pub async fn create_session(
 ) -> impl Responder {
     let mut state = state.lock().await;
 
-    if !state.authenticate(
-        &data.user.clone().unwrap_or("".to_string()),
-        &data.password.clone().unwrap_or("".to_string()),
-    ) {
-        return HttpResponse::Unauthorized().finish();
+    let user = &data.user.clone().unwrap_or("".to_string());
+    let password = &data.password.clone().unwrap_or("".to_string());
+
+    match state.authenticate(&user, &password) {
+        Err(err) => {
+            log::error!(
+                "create session: Failed to check user password ({}): {}",
+                err,
+                &user
+            );
+            return HttpResponse::Unauthorized().finish();
+        }
+        Ok(false) => {
+            log::error!("create session: Unknown user failed to login: {}", &user);
+            return HttpResponse::Unauthorized().finish();
+        }
+        Ok(true) => {
+            // carry on
+        }
     }
 
     let tags_aux = match models::TagsAux::from_share_id(&data.share_id) {
@@ -135,13 +149,23 @@ pub async fn login(
 ) -> actix_web::Result<impl Responder> {
     let mut state = app_state.lock().await;
 
-    if let Some(token) = state.create_token(&data.username, &data.password) {
-        Ok(web::Json(LoginResponse {
+    match state.create_token(&data.username, &data.password) {
+        Ok(Some(token)) => Ok(web::Json(LoginResponse {
             token,
             version: crate::version::VERSION.to_string(),
-        }))
-    } else {
-        Err(actix_web::error::ErrorUnauthorized("Invalid credentials."))
+        })),
+        Ok(None) => {
+            log::error!("login: Unknown user failed to login: {}", &data.username);
+            Err(actix_web::error::ErrorUnauthorized("Invalid credentials."))
+        }
+        Err(err) => {
+            log::error!(
+                "login: Failed to check user password ({}): {}",
+                err,
+                &data.username
+            );
+            Err(actix_web::error::ErrorUnauthorized("Invalid credentials."))
+        }
     }
 }
 

@@ -160,17 +160,27 @@ impl State {
         Ok(())
     }
 
-    pub fn authenticate(&self, user: &str, password: &str) -> bool {
-        self.users.get(user).is_some_and(|p| p == password)
+    pub fn authenticate(&self, user: &str, password: &str) -> anyhow::Result<bool> {
+        self.users.get(user).map_or_else(
+            || Err(anyhow::anyhow!("No such user: {}", user)),
+            |p| {
+                if p.starts_with("$") {
+                    bcrypt::verify(password, &p)
+                        .map_err(|e| anyhow::anyhow!("Failed to use bcrypt verify: {}", e))
+                } else {
+                    Ok(p == password)
+                }
+            },
+        )
     }
 
-    pub fn create_token(&mut self, user: &str, password: &str) -> Option<String> {
-        if self.authenticate(user, password) {
+    pub fn create_token(&mut self, user: &str, password: &str) -> anyhow::Result<Option<String>> {
+        if self.authenticate(user, password)? {
             let token = utils::generate_id();
             self.tokens.insert(token.clone());
-            Some(token)
+            Ok(Some(token))
         } else {
-            None
+            Ok(None)
         }
     }
 
