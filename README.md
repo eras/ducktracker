@@ -55,9 +55,13 @@ Enter user:pass to ducktracker.passwd, e.g.
 
 ```
 hello:world
+hello2:$2b$12$7KCLyegP2KL.9X6LpKiLh.5ybmH5KWFFDCXD2KRANBfUmfqQ5cDv.
 ```
 
-(encryption is not supported yet)
+For encrypting passwords use bcrypt. You may use `htpasswd -B
+ducktracker.passwd username` to add new users to the file (available
+in Debian's `apache2-utils`). You need to restart the server to reload
+it.
 
 ## Hauk
 
