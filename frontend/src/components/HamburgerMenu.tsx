@@ -17,7 +17,7 @@ const HamburgerMenu: React.FC = () => {
   const isLoggedIn = !!username;
 
   return (
-    <div className="fixed bottom-4 left-4 z-40">
+    <div className="fixed top-4 right-4 z-40">
       {/* Hamburger Icon */}
       <button
         onClick={() => setIsOpen(!isOpen)}
@@ -51,7 +51,7 @@ const HamburgerMenu: React.FC = () => {
 
       {/* Menu Content */}
       <div
-        className={`absolute bottom-full mb-2 w-48 origin-bottom-left transform rounded-md bg-green-800 shadow-xl transition-all duration-300 ease-in-out ${
+        className={`absolute top-full right-0 mt-2 w-48 origin-top-right transform rounded-md bg-green-800 shadow-xl transition-all duration-300 ease-in-out ${
           isOpen
             ? "scale-100 opacity-100"
             : "scale-95 opacity-0 pointer-events-none"
