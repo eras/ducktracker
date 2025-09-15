@@ -55,14 +55,34 @@ pub async fn create_session(
     // Calculate the expiration time.
     let expires_at = Utc::now() + Duration::seconds(data.duration as i64);
 
-    let share_id = models::ShareId(
-        tags_aux
+    let share_id = models::ShareId({
+        let private_tags: String = tags_aux
             .0
             .iter()
-            .map(|x| x.to_string())
+            .filter_map(|x| {
+                if !x.is_public() {
+                    Some(x.as_tag().0)
+                } else {
+                    None
+                }
+            })
             .collect::<Vec<_>>()
-            .join(","),
-    );
+            .join(",");
+        let public_tags: String = tags_aux
+            .0
+            .iter()
+            .filter_map(|x| {
+                if x.is_public() {
+                    Some(x.as_tag().0)
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>()
+            .join(",");
+
+        format!("pub:{public_tags},priv:{private_tags}")
+    });
 
     let session_id = state.add_session(expires_at, tags_aux, options).await;
 
