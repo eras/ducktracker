@@ -3,12 +3,11 @@
 import unittest
 import requests
 import time
-import sseclient
 import random
 import string
 
-from typing import Generator
 from . import dt_types
+from .api import DTConfig, stream_sse
 
 
 def random_string() -> str:
@@ -21,53 +20,17 @@ class HaukApiTest(unittest.TestCase):
     TEST_USERNAME = "testuser"
     TEST_PASSWORD = "testpassword"
 
+    def setUp(self) -> None:
+        self.api_config = DTConfig(
+            base_url=self.BASE_URL,
+            username=self.TEST_USERNAME,
+            password=self.TEST_PASSWORD,
+        )
+
     def parse_response(self, response: str) -> list[str]:
         lines = response.strip().split("\n")
         self.assertEqual(lines[0], "OK")
         return lines
-
-    def stream_sse(
-        self, tags: list[str], read_timeout: float | None = None
-    ) -> tuple[Generator[dt_types.StreamEvent, None, None], requests.Response]:
-        """
-        Connects to the SSE stream and returns a generator for events and the raw requests.Response object.
-        The caller is responsible for closing the requests.Response object using its .close() method.
-        """
-        response = requests.post(
-            f"{self.BASE_URL}login",
-            json={"username": self.TEST_USERNAME, "password": self.TEST_PASSWORD},
-        )
-        token = dt_types.LoginResponse.model_validate(response.json()).token
-
-        headers = {"Accept": "text/event-stream"}
-        tags_str = ",".join(tags)
-
-        # Set a connect timeout (e.g., 5 seconds) and use the provided read_timeout.
-        # If read_timeout is None, requests defaults to no read timeout.
-        req_timeout = (5, read_timeout) if read_timeout is not None else 5
-
-        # The 'stream=True' is crucial for sseclient to read incrementally
-        raw_sse_response = requests.get(
-            f"{self.BASE_URL}stream?token={token}&tags={tags_str}",
-            stream=True,
-            headers=headers,
-            timeout=req_timeout,
-        )
-
-        deadline = time.monotonic() + read_timeout if read_timeout else None
-
-        def event_generator() -> Generator[dt_types.StreamEvent, None, None]:
-            client = sseclient.SSEClient(raw_sse_response)
-            for event in client.events():
-                if deadline and time.monotonic() >= deadline:
-                    break
-                parsed = dt_types.StreamEvent.model_validate_json(event.data)
-                if parsed.changes:
-                    yield parsed
-                else:
-                    break
-
-        return event_generator(), raw_sse_response
 
     def test_create_and_fetch_session(self) -> None:
         """Tests the session creation and basic data retrieval."""
@@ -99,7 +62,7 @@ class HaukApiTest(unittest.TestCase):
             share_id = lines[3]
 
             # 2. Test fetch_location endpoint with the new session ID
-            stream_gen, sse_response = self.stream_sse([tag])
+            stream_gen, sse_response = stream_sse(self.api_config, [tag])
             first = next(stream_gen)
             self.assertEqual(first.changes[0], "reset")
             self.assertEqual(list(first.changes[1].add_fetch.tags.values()), [[tag]])
@@ -161,7 +124,7 @@ class HaukApiTest(unittest.TestCase):
             self.assertEqual(self.parse_response(response.text)[0], "OK")
 
             # 2. Test fetch_location to retrieve the posted data
-            stream_gen, sse_response = self.stream_sse([tag])
+            stream_gen, sse_response = stream_sse(self.api_config, [tag])
             first = next(stream_gen)
             self.assertEqual(first.changes[0], "reset")
             self.assertEqual(list(first.changes[1].add_fetch.tags.values()), [[tag]])
@@ -223,8 +186,8 @@ class HaukApiTest(unittest.TestCase):
 
             # Try to fetch events WITHOUT providing the specific tag, for at most 2 seconds.
             # We expect no events related to the posted location or session.
-            stream_gen, sse_response = self.stream_sse(
-                [], read_timeout=2
+            stream_gen, sse_response = stream_sse(
+                self.api_config, [], read_timeout=2
             )  # Empty list of tags
             collected_events: list[dt_types.StreamEvent] = []
 
@@ -298,11 +261,10 @@ class HaukApiTest(unittest.TestCase):
             # No need to post location data for this test, as we only care about the tag's existence.
 
             # 2. Start a fetch session WITHOUT specifying any tags to subscribe to ALL public tags
-            stream_gen, sse_response = self.stream_sse(
-                [], read_timeout=5
+            stream_gen, sse_response = stream_sse(
+                self.api_config, [], read_timeout=5
             )  # Empty list subscribes to public tags
 
-            # The initial 'reset' event should contain the public tag information
             first_event: dt_types.StreamEvent | None = None
             try:
                 first_event = next(stream_gen)
@@ -360,8 +322,8 @@ class HaukApiTest(unittest.TestCase):
 
             # 1. Start a fetch session WITHOUT specifying any tags to subscribe to ALL public tags.
             # Use a long enough read_timeout to allow for tag creation and event propagation.
-            stream_gen, sse_response = self.stream_sse(
-                [], read_timeout=15
+            stream_gen, sse_response = stream_sse(
+                self.api_config, [], read_timeout=15
             )  # 15 seconds for this scenario
 
             collected_events: list[dt_types.StreamEvent] = []
