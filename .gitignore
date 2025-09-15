@@ -14,3 +14,4 @@ ducktracker.db-wal
 ducktracker.passwd
 .emacs.desktop
 .emacs.desktop.lock
+doc
