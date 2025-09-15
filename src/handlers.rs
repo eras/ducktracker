@@ -44,7 +44,7 @@ pub async fn create_session(
         }
     }
 
-    let tags_aux = match models::TagsAux::from_share_id(&data.share_id) {
+    let (tags_aux, options) = match models::TagsAux::parse_share_id(&data.share_id) {
         Ok(x) => x,
         Err(err) => {
             return HttpResponse::BadRequest()
@@ -64,7 +64,7 @@ pub async fn create_session(
             .join(","),
     );
 
-    let session_id = state.add_session(expires_at, tags_aux).await;
+    let session_id = state.add_session(expires_at, tags_aux, options).await;
 
     let base_url = if let Some(server_name) = state.server_name.clone() {
         format!("{}://{}", state.http_scheme, server_name)

@@ -15,6 +15,7 @@ pub struct DbSession {
     pub expires_at: DateTime<Utc>,
     pub fetch_id: models::FetchId,
     pub tags: TagsAux,
+    pub max_points: usize,
 }
 
 impl From<&state::Session> for DbSession {
@@ -25,6 +26,7 @@ impl From<&state::Session> for DbSession {
             expires_at: session.expires_at,
             fetch_id: session.fetch_id,
             tags: session.tags.clone(),
+            max_points: session.max_points,
         }
     }
 }
@@ -39,6 +41,7 @@ impl From<DbSession> for state::Session {
             expires_at: db_session.expires_at,
             fetch_id: db_session.fetch_id,
             tags: db_session.tags,
+            max_points: db_session.max_points,
         }
     }
 }

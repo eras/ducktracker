@@ -29,6 +29,7 @@ pub struct Session {
     pub expires_at: DateTime<Utc>,
     pub fetch_id: models::FetchId,
     pub tags: models::TagsAux,
+    pub max_points: usize,
 }
 
 pub struct State {
@@ -195,6 +196,7 @@ impl State {
         &mut self,
         expires_at: DateTime<Utc>,
         tags_aux: models::TagsAux,
+        options: models::Options,
     ) -> models::SessionId {
         let session_id = models::SessionId(utils::generate_id());
         let fetch_id = self.generate_fetch_id();
@@ -214,6 +216,7 @@ impl State {
             expires_at,
             fetch_id,
             tags: tags_aux.clone(),
+            max_points: options.max_points.unwrap_or(self.max_points),
         };
         self.expirations.push(Reverse((
             new_session.expires_at,
@@ -223,7 +226,8 @@ impl State {
             .insert(session_id.clone(), new_session.clone());
         self.session_added.notify_waiters();
         self.add_public_tags_for_session(&new_session);
-        self.add_fetch(fetch_id, tags_aux).await;
+        self.add_fetch(fetch_id, tags_aux, new_session.max_points)
+            .await;
 
         // Persist the new session to the database asynchronously
         let db_client = self.db_client.clone();
@@ -363,7 +367,12 @@ impl State {
         }
     }
 
-    pub async fn add_fetch(&mut self, fetch_id: models::FetchId, tags_aux: models::TagsAux) {
+    pub async fn add_fetch(
+        &mut self,
+        fetch_id: models::FetchId,
+        tags_aux: models::TagsAux,
+        max_points: usize,
+    ) {
         let public_tags = tags_aux.public_tags();
         let tags: models::Tags = tags_aux.into();
 
@@ -382,7 +391,7 @@ impl State {
             changes: [UpdateChange::AddFetch {
                 tags: new_tags,
                 public: public_tags,
-                max_points: self.max_points,
+                max_points,
             }]
             .to_vec(),
         };
@@ -427,7 +436,7 @@ impl State {
 
         let locs = &mut session.locations;
         locs.push_back(new_location.clone());
-        if locs.len() > self.max_points {
+        if locs.len() > session.max_points {
             locs.pop_front();
         }
 

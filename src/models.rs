@@ -319,36 +319,65 @@ impl Tags {
     }
 }
 
+pub struct Options {
+    pub max_points: Option<usize>,
+}
+
 impl TagsAux {
-    pub fn from_share_id(share_id: &Option<String>) -> anyhow::Result<Self> {
+    pub fn parse_share_id(share_id: &Option<String>) -> anyhow::Result<(Self, Options)> {
+        use anyhow::Context;
+
+        let mut options = Options { max_points: None };
+
         match share_id {
-            None => Ok(TagsAux(
-                std::iter::once(TagAux::new(&utils::generate_id(), TagVisibility::Private)?)
-                    .collect(),
-            )), // TODO: in this case, use some configurable default tag
-            Some(share_id) => {
-                let share_id: String = share_id.chars().filter(|c| !c.is_whitespace()).collect();
+            None => Ok((
+                TagsAux(
+                    std::iter::once(TagAux::new(&utils::generate_id(), TagVisibility::Private)?)
+                        .collect(),
+                ),
+                options, // Return default options
+            )),
+            Some(share_id_str) => {
+                let share_id_processed: String = share_id_str
+                    .chars()
+                    .filter(|c| !c.is_whitespace())
+                    .collect();
                 let mut tags = HashSet::new();
-                for field in share_id.split(",") {
-                    if let Some((keyword, tag)) = field.split_once(':') {
-                        let keyword = match keyword {
-                            "pub" | "public" => Some(TagVisibility::Public),
-                            "priv" | "private" => Some(TagVisibility::Private),
-                            _ => None,
-                        };
+
+                for field in share_id_processed.split(",") {
+                    if field.is_empty() {
+                        continue; // Skip empty fields that might arise from ",," or trailing ","
+                    }
+                    if let Some((keyword, value)) = field.split_once(':') {
                         match keyword {
-                            Some(keyword) => {
-                                tags.insert(TagAux::new(tag, keyword.clone())?);
+                            "pub" | "public" => {
+                                tags.insert(TagAux::new(value, TagVisibility::Public)?);
                             }
-                            None => {
-                                return Err(anyhow::anyhow!("Invalid keyword"));
+                            "priv" | "private" => {
+                                tags.insert(TagAux::new(value, TagVisibility::Private)?);
+                            }
+                            "points" => {
+                                let parsed_points = value.parse::<usize>().with_context(|| {
+                                    format!(
+                                        "Invalid value for 'points' keyword: '{}' is not a valid unsigned integer",
+                                        value
+                                    )
+                                })?;
+                                options.max_points = Some(parsed_points);
+                            }
+                            _ => {
+                                return Err(anyhow::anyhow!(
+                                    "Invalid or unknown keyword '{}' in share_id",
+                                    keyword
+                                ));
                             }
                         }
                     } else {
+                        // If no keyword specified, default to private tag
                         tags.insert(TagAux::new(field, TagVisibility::Private)?);
                     }
                 }
-                Ok(TagsAux(tags))
+                Ok((TagsAux(tags), options))
             }
         }
     }

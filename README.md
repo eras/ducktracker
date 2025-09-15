@@ -31,6 +31,17 @@ would result in two shares: `everyone` would be public, while
 By default, if the share id is left empty in the Hauk mobile client, a
 random private id is generated for the user.
 
+# Tag formats
+
+| Tag/Syntax        | Description                                                                 |
+|-------------------|-----------------------------------------------------------------------------|
+| `private:tagname` | Private tag, only sent to clients that know it already                      |
+| `priv:tagname`    | (Same as above)                                                             |
+| `tagname`         | (Same as above)                                                             |
+| `public:tagname`  | Public tag, pushed to clients that ask for all tags                         |
+| `pub:tagname`     | (Same as above)                                                             |
+| `points:42`       | Not a tag; set the maximum number of points to store for this share session |
+
 # Compilation
 
 1) `scripts/export-models-types.sh --release` to generate frontend/bindings
