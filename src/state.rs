@@ -37,7 +37,7 @@ pub struct State {
     expirations: BinaryHeap<Reverse<(DateTime<Utc>, models::SessionId)>>,
 
     pub updates: Updates,
-    public_tags: models::Tags,
+    public_tags: HashMap<models::Tag, usize>, // reference count
     pub default_tag: models::Tag,
 
     pub http_scheme: String,
@@ -82,8 +82,6 @@ impl State {
         let db_client = Arc::new(DbClient::new(database_file).await?); // Initialize DB client
 
         let default_tag = models::Tag(default_tag.to_string());
-        let mut public_tags = models::Tags::new();
-        public_tags.0.insert(default_tag.clone());
 
         let mut state = Self {
             updates,
@@ -91,11 +89,11 @@ impl State {
             session_added: Arc::new(Notify::new()),
             expirations: BinaryHeap::new(),
             next_fetch_id: models::FetchId::default(),
-            public_tags,
+            public_tags: HashMap::new(),
             users,
             tokens: bounded_set::BoundedSet::new(MAX_TOKENS),
             db_client,
-            default_tag,
+            default_tag: default_tag.clone(),
             http_scheme: http_scheme.to_string(),
             server_name: server_name.map(|x| x.to_string()),
             max_points,
@@ -104,6 +102,8 @@ impl State {
             prometheus_user,
             prometheus_password,
         };
+
+        state.add_public_tag(default_tag);
 
         state.load_state().await?;
 
@@ -134,11 +134,7 @@ impl State {
                 let session: Session = db_session.into();
 
                 // Re-populate public tags from the restored session
-                for tag in session.tags.0.iter() {
-                    if tag.is_public() {
-                        self.public_tags.0.insert(tag.as_tag());
-                    }
-                }
+                self.add_public_tags_for_session(&session);
 
                 // Update next_fetch_id to be greater than any loaded fetch_id
                 if session.fetch_id.0 > highest_fetch_id {
@@ -188,8 +184,11 @@ impl State {
         self.tokens.contains(token)
     }
 
-    pub fn public_tags<'a>(&'a self) -> &'a models::Tags {
-        &self.public_tags
+    pub fn public_tags<'a>(&self) -> models::Tags {
+        self.public_tags
+            .iter()
+            .map(|(tag, _)| tag.clone())
+            .collect()
     }
 
     pub async fn add_session(
@@ -223,6 +222,7 @@ impl State {
         self.sessions
             .insert(session_id.clone(), new_session.clone());
         self.session_added.notify_waiters();
+        self.add_public_tags_for_session(&new_session);
         self.add_fetch(fetch_id, tags_aux).await;
 
         // Persist the new session to the database asynchronously
@@ -316,6 +316,8 @@ impl State {
             };
             self.updates.send_update(context, update);
 
+            self.remove_public_tags_for_session(&session);
+
             // Delete the session from the database asynchronously
             let db_client = self.db_client.clone();
             let session_id_clone = session_id.clone();
@@ -327,13 +329,41 @@ impl State {
         }
     }
 
-    pub async fn add_fetch(&mut self, fetch_id: models::FetchId, tags_aux: models::TagsAux) {
-        for tag in tags_aux.0.iter() {
-            if tag.visibility == models::TagVisibility::Public {
-                self.public_tags.0.insert(tag.as_tag());
+    fn add_public_tag(&mut self, tag: models::Tag) {
+        *self.public_tags.entry(tag).or_insert(0) += 1;
+    }
+
+    fn add_public_tags_for_session(&mut self, session: &Session) {
+        for tag in session.tags.0.iter() {
+            if tag.is_public() {
+                self.add_public_tag(tag.as_tag());
             }
         }
+    }
 
+    fn remove_public_tag(&mut self, tag: models::Tag) {
+        use std::collections::hash_map::Entry;
+        match self.public_tags.entry(tag) {
+            Entry::Occupied(mut entry) => {
+                let value = entry.get_mut();
+                *value -= 1;
+                if *value == 0 {
+                    entry.remove();
+                }
+            }
+            Entry::Vacant(_vacant_entry) => (),
+        }
+    }
+
+    fn remove_public_tags_for_session(&mut self, session: &Session) {
+        for tag in session.tags.0.iter() {
+            if tag.is_public() {
+                self.remove_public_tag(tag.as_tag());
+            }
+        }
+    }
+
+    pub async fn add_fetch(&mut self, fetch_id: models::FetchId, tags_aux: models::TagsAux) {
         let public_tags = tags_aux.public_tags();
         let tags: models::Tags = tags_aux.into();
 
@@ -560,7 +590,11 @@ impl Updates {
             .collect();
         changes.push(UpdateChange::AddFetch {
             tags: fetch_tags,
-            public: state.public_tags.clone(),
+            public: state
+                .public_tags
+                .iter()
+                .map(|(tag, _)| tag.clone())
+                .collect(),
             max_points: state.max_points,
         });
         changes.push(UpdateChange::Add { points });
