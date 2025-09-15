@@ -12,6 +12,7 @@ export interface ProtocolState {
   fetches: Fetches;
   subscribedTags: Set<Tag>;
   publicTags: Set<Tag>;
+  serverTime: number; // Added: Server time in milliseconds from Unix epoch
   connect: (
     tags: string[],
     addTags: (tags: Set<string>) => void,
@@ -190,7 +191,14 @@ export const useProtocolStore = create<ProtocolState>((set) => {
       try {
         const data: Update = JSON.parse(event.data);
         let addedTags = new Set<string>();
-        set((state) => processUpdates(data.changes, state, addedTags));
+        set((state) => {
+          const newState = processUpdates(data.changes, state, addedTags);
+          const serverTimeSeconds = data.meta.serverTime / 1000000;
+          return {
+            ...newState,
+            serverTime: serverTimeSeconds,
+          };
+        });
         addTags(addedTags);
       } catch (e) {
         console.error("Failed to parse SSE message:", e);
@@ -244,6 +252,7 @@ export const useProtocolStore = create<ProtocolState>((set) => {
     fetches: {},
     subscribedTags: new Set<string>(),
     publicTags: new Set<string>(),
+    serverTime: 0, // Initial server time
     connect,
     disconnect,
   };

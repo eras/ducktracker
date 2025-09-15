@@ -3,9 +3,28 @@ import { useAppStore } from "../hooks/useStore";
 import { intersection } from "../lib/set";
 import useThrottle from "../hooks/useThrottle";
 import "leaflet";
+import { useProtocolStore } from "../lib/protocol"; // Import useProtocolStore to get serverTime
 
 // Use a global L from the script tag
 declare const L: typeof import("leaflet");
+
+// --- Color Fading Constants ---
+const START_COLOR_RGBA = [0, 0, 255, 1]; // Opaque blue for recent data
+const END_COLOR_RGBA = [0, 0, 128, 0.2]; // Faded blue for old data
+const MAX_AGE_FADE_SECONDS = 3600;
+
+// Helper function to interpolate RGBA colors
+const interpolateColor = (
+  color1: number[],
+  color2: number[],
+  factor: number,
+): string => {
+  const r = Math.round(color1[0] + factor * (color2[0] - color1[0]));
+  const g = Math.round(color1[1] + factor * (color2[1] - color1[1]));
+  const b = Math.round(color1[2] + factor * (color2[2] - color1[2]));
+  const a = color1[3] + factor * (color2[3] - color1[3]);
+  return `rgba(${r},${g},${b},${a.toFixed(2)})`;
+};
 
 const MapComponent: React.FC = () => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
@@ -16,6 +35,7 @@ const MapComponent: React.FC = () => {
   const isFirstUpdateRef = useRef(true); // Used for initial map bounds/centering
   const { fetches, selectedTags, showClientLocation, clientLocation } =
     useAppStore();
+  const { serverTime } = useProtocolStore(); // Get serverTime from protocol store
   const throttledFetches = useThrottle(fetches, 1000);
 
   // Initialize the map (runs only once)
@@ -63,20 +83,34 @@ const MapComponent: React.FC = () => {
       const isFiltered = selectedTags.size > 0 && !hasSelectedTag;
 
       if (!isFiltered) {
-        const points = fetch.locations.map(
-          (loc) => loc.latlon as L.LatLngTuple,
-        );
+        // Render polyline segments with fading effect
+        for (let i = 0; i < fetch.locations.length - 1; i++) {
+          const loc1 = fetch.locations[i];
+          const loc2 = fetch.locations[i + 1];
 
-        // Render polyline
-        const polyline = L.polyline(points, { color: "blue", weight: 3 });
-        polylinesRef.current?.addLayer(polyline);
+          const ageSeconds = Math.max(0, serverTime - loc2.time);
+
+          let factor = Math.min(1, ageSeconds / MAX_AGE_FADE_SECONDS);
+
+          const segmentColor = interpolateColor(
+            START_COLOR_RGBA,
+            END_COLOR_RGBA,
+            factor,
+          );
+
+          const segmentPolyline = L.polyline([loc1.latlon, loc2.latlon], {
+            color: segmentColor,
+            weight: 3,
+          });
+          polylinesRef.current?.addLayer(segmentPolyline);
+        }
 
         // Render markers for trace end points
         if (fetch.locations.length) {
           const loc = fetch.locations[fetch.locations.length - 1];
           const marker = L.circleMarker(loc.latlon, {
             radius: 6,
-            fillColor: "#0078A8",
+            fillColor: "#0078A8", // You could also make this dynamic based on the last point's age
             color: "#fff",
             weight: 1,
             opacity: 1,
@@ -133,7 +167,13 @@ const MapComponent: React.FC = () => {
       mapRef.current.fitBounds(bounds, { padding: [50, 50], animate: false });
       isFirstUpdateRef.current = false;
     }
-  }, [throttledFetches, selectedTags, showClientLocation, clientLocation]); // Add new dependencies
+  }, [
+    throttledFetches,
+    selectedTags,
+    showClientLocation,
+    clientLocation,
+    serverTime,
+  ]); // Add serverTime to dependencies
 
   return <div ref={mapContainerRef} className="w-full h-full z-0" />;
 };

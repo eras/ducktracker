@@ -7,13 +7,13 @@ export interface ParsedLocation {
   accuracy?: number;
   speed?: number;
   provider: number;
-  time: number;
+  time: number; // seconds from epoch
 }
 
 export let parseLocation = (location: Location): ParsedLocation => {
   return {
     latlon: [location[0], location[1]],
-    time: location[2],
+    time: location[2], // seconds from epoch
     speed: location[3],
     accuracy: location[4],
     provider: location[5],
