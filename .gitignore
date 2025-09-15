@@ -15,3 +15,5 @@ ducktracker.passwd
 .emacs.desktop
 .emacs.desktop.lock
 doc
+__pycache__
+report.xml
