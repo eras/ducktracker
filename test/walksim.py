@@ -75,7 +75,7 @@ def generate_random_tags(
         [f"public:{x}" for x in public_tags], min(num_public, len(public_tags))
     )
     selected_private = random.sample(
-        [f"private:{x}" for x in public_tags], min(num_private, len(private_tags))
+        [f"private:{x}" for x in private_tags], min(num_private, len(private_tags))
     )
     all_selected_tags = selected_public + selected_private
     random.shuffle(all_selected_tags)  # Mix them up
