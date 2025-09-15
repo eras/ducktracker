@@ -7,6 +7,7 @@ import { useProtocolStore } from "./lib/protocol";
 import { useAppStore } from "./hooks/useStore";
 import { useAuthStore } from "./hooks/useAuthStore";
 import { useGeolocation } from "./hooks/useGeolocation"; // New import for the geolocation hook
+import HamburgerMenu from "./components/HamburgerMenu.tsx";
 
 const App: React.FC = () => {
   const { connect, disconnect } = useProtocolStore();
@@ -36,6 +37,7 @@ const App: React.FC = () => {
       <TagFilter />
       <LoginOverlay />
       <LocationButton />
+      <HamburgerMenu />
     </div>
   );
 };
