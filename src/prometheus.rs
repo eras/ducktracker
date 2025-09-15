@@ -63,6 +63,15 @@ pub fn generate_metrics(state: &State, sse_counter: u64, start_time: &Instant) -
         ducktracker_private_tags.len()
     ));
 
+    lines.push(
+        "# HELP ducktracker_info Build information about the DuckTracker server.".to_string(),
+    );
+    lines.push("# TYPE ducktracker_info gauge".to_string());
+    lines.push(format!(
+        "ducktracker_info{{version=\"{}\"}} 1",
+        crate::version::VERSION
+    ));
+
     // NOTE: The more complex average-based metrics require tracking historical
     // data (e.g., all post timestamps, session start/end times) which is
     // not currently stored in the application state.
