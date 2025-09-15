@@ -1,16 +1,28 @@
 import React, { useState } from "react";
 import { useAuthStore } from "../hooks/useAuthStore";
 import { useProtocolStore } from "../lib/protocol";
+import { useAppStore } from "../hooks/useStore";
 
 const HamburgerMenu: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const { username, clearCredentials } = useAuthStore();
   const { disconnect } = useProtocolStore();
 
+  const showClientLocation = useAppStore((state) => state.showClientLocation);
+  const toggleClientLocation = useAppStore(
+    (state) => state.toggleClientLocation,
+  );
+
   const handleLogout = () => {
     disconnect(); // Terminate SSE session
     clearCredentials(); // Clear persisted username and password
     setIsOpen(false); // Close the menu
+  };
+
+  // The logout button should only be visible if a user is logged in
+  const handleToggleLocation = () => {
+    toggleClientLocation();
+    setIsOpen(false); // Close the menu after action
   };
 
   // The logout button should only be visible if a user is logged in
@@ -70,6 +82,16 @@ const HamburgerMenu: React.FC = () => {
               Not logged in
             </span>
           )}
+
+          {/* Location Tracking Toggle */}
+          <button
+            onClick={handleToggleLocation}
+            className="block w-full px-4 py-2 text-center text-sm text-white hover:bg-blue-700 hover:text-white"
+          >
+            {showClientLocation
+              ? "Disable Location Tracking"
+              : "Enable Location Tracking"}
+          </button>
           {/* Add more menu items here if needed */}
         </div>
       </div>

@@ -2,7 +2,6 @@ import React, { useEffect } from "react";
 import MapComponent from "./components/MapComponent";
 import TagFilter from "./components/TagFilter";
 import LoginOverlay from "./components/LoginOverlay";
-import LocationButton from "./components/LocationButton"; // New import for the button
 import { useProtocolStore } from "./lib/protocol";
 import { useAppStore } from "./hooks/useStore";
 import { useAuthStore } from "./hooks/useAuthStore";
@@ -36,7 +35,6 @@ const App: React.FC = () => {
       <MapComponent />
       <TagFilter />
       <LoginOverlay />
-      <LocationButton />
       <HamburgerMenu />
     </div>
   );
