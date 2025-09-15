@@ -37,7 +37,7 @@ pub struct State {
     expirations: BinaryHeap<Reverse<(DateTime<Utc>, models::SessionId)>>,
 
     pub updates: Updates,
-    pub public_tags: models::Tags, // Make `public_tags` public
+    public_tags: models::Tags,
     pub default_tag: models::Tag,
 
     pub http_scheme: String,
@@ -188,8 +188,8 @@ impl State {
         self.tokens.contains(token)
     }
 
-    pub fn get_public_tags(&self) -> models::Tags {
-        self.public_tags.clone()
+    pub fn public_tags<'a>(&'a self) -> &'a models::Tags {
+        &self.public_tags
     }
 
     pub async fn add_session(

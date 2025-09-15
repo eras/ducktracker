@@ -44,7 +44,7 @@ pub fn generate_metrics(state: &State, sse_counter: u64, start_time: &Instant) -
     lines.push("# TYPE ducktracker_public_tags gauge".to_string());
     lines.push(format!(
         "ducktracker_public_tags {}",
-        state.public_tags.len()
+        state.public_tags().len()
     ));
 
     let ducktracker_private_tags: HashSet<_> = state

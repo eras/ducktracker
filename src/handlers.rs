@@ -263,7 +263,7 @@ pub async fn stream(
         return Err(actix_web::error::ErrorUnauthorized("Invalid credentials."));
     }
     let (auto_subscribe, tags) = if data.tags.0.is_empty() {
-        (true, state.get_public_tags().0.clone())
+        (true, state.public_tags().0.clone())
     } else {
         (false, data.tags.0.iter().cloned().collect())
     };
