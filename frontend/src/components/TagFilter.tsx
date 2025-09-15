@@ -24,7 +24,7 @@ const TagFilter: React.FC = () => {
     <div className="p-4 bg-white shadow-lg rounded-xl m-4 absolute bottom-0 left-0 z-10 flex flex-col gap-4 backdrop-blur-sm bg-white/70">
       <div className="flex flex-wrap gap-2">
         {tags.size > 0 ? (
-          [...tags].map((tag) => {
+          [...tags].sort().map((tag) => {
             const isCustom = customTags.has(tag);
             const isSelected = selectedTags.has(tag);
 
