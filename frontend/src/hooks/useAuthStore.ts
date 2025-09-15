@@ -33,12 +33,12 @@ const saveCredentials = (user: string, pass: string) => {
   }
 };
 
+// Actually nukes everything else as well
 const clearStoredCredentials = () => {
   try {
-    localStorage.removeItem(USER_KEY);
-    localStorage.removeItem(PASS_KEY);
+    localStorage.clear(); // Clears all items for this domain
   } catch (e) {
-    console.error("Failed to clear credentials from localStorage", e);
+    console.error("Failed to clear localStorage", e);
   }
 };
 
