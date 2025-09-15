@@ -137,9 +137,7 @@ const MapComponent: React.FC = () => {
         clientLocationMarkerRef.current = L.marker(clientLocation, {
           icon: clientIcon,
         }).addTo(mapRef.current);
-        clientLocationMarkerRef.current
-          .bindTooltip("Your Location")
-          .openTooltip();
+        clientLocationMarkerRef.current.bindTooltip("Your Location");
       } else {
         clientLocationMarkerRef.current.setLatLng(clientLocation);
       }
