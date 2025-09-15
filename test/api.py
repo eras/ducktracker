@@ -18,6 +18,7 @@ def stream_sse(
     config: DTConfig,
     tags: list[str],
     read_timeout: float | None = None,
+    stop_on_quiescent: bool = False,
 ) -> tuple[Generator[dt_types.StreamEvent, None, None], requests.Response]:
     """
     Connects to the SSE stream and returns a generator for events and the raw requests.Response object.
@@ -34,7 +35,10 @@ def stream_sse(
 
     # Set a connect timeout (e.g., 5 seconds) and use the provided read_timeout.
     # If read_timeout is None, requests defaults to no read timeout.
-    req_timeout = (5, read_timeout) if read_timeout is not None else 5
+    if read_timeout is not None:
+        req_timeout = (5, read_timeout)
+    else:
+        req_timeout = None
 
     # The 'stream=True' is crucial for sseclient to read incrementally
     raw_sse_response = requests.get(
@@ -55,6 +59,7 @@ def stream_sse(
             if parsed.changes:
                 yield parsed
             else:
-                break
+                if stop_on_quiescent:
+                    break
 
     return event_generator(), raw_sse_response

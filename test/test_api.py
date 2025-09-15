@@ -62,7 +62,9 @@ class HaukApiTest(unittest.TestCase):
             share_id = lines[3]
 
             # 2. Test fetch_location endpoint with the new session ID
-            stream_gen, sse_response = stream_sse(self.api_config, [tag])
+            stream_gen, sse_response = stream_sse(
+                self.api_config, [tag], stop_on_quiescent=True
+            )
             first = next(stream_gen)
             self.assertEqual(first.changes[0], "reset")
             self.assertEqual(list(first.changes[1].add_fetch.tags.values()), [[tag]])
@@ -124,7 +126,9 @@ class HaukApiTest(unittest.TestCase):
             self.assertEqual(self.parse_response(response.text)[0], "OK")
 
             # 2. Test fetch_location to retrieve the posted data
-            stream_gen, sse_response = stream_sse(self.api_config, [tag])
+            stream_gen, sse_response = stream_sse(
+                self.api_config, [tag], stop_on_quiescent=True
+            )
             first = next(stream_gen)
             self.assertEqual(first.changes[0], "reset")
             self.assertEqual(list(first.changes[1].add_fetch.tags.values()), [[tag]])
@@ -187,7 +191,7 @@ class HaukApiTest(unittest.TestCase):
             # Try to fetch events WITHOUT providing the specific tag, for at most 2 seconds.
             # We expect no events related to the posted location or session.
             stream_gen, sse_response = stream_sse(
-                self.api_config, [], read_timeout=2
+                self.api_config, [], read_timeout=2, stop_on_quiescent=True
             )  # Empty list of tags
             collected_events: list[dt_types.StreamEvent] = []
 
@@ -262,7 +266,7 @@ class HaukApiTest(unittest.TestCase):
 
             # 2. Start a fetch session WITHOUT specifying any tags to subscribe to ALL public tags
             stream_gen, sse_response = stream_sse(
-                self.api_config, [], read_timeout=5
+                self.api_config, [], read_timeout=5, stop_on_quiescent=True
             )  # Empty list subscribes to public tags
 
             first_event: dt_types.StreamEvent | None = None
@@ -323,7 +327,7 @@ class HaukApiTest(unittest.TestCase):
             # 1. Start a fetch session WITHOUT specifying any tags to subscribe to ALL public tags.
             # Use a long enough read_timeout to allow for tag creation and event propagation.
             stream_gen, sse_response = stream_sse(
-                self.api_config, [], read_timeout=15
+                self.api_config, [], read_timeout=15, stop_on_quiescent=True
             )  # 15 seconds for this scenario
 
             collected_events: list[dt_types.StreamEvent] = []
