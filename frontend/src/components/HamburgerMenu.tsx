@@ -21,7 +21,7 @@ const HamburgerMenu: React.FC = () => {
       {/* Hamburger Icon */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex h-12 w-12 items-center justify-center rounded-full bg-green-700 p-2 text-white shadow-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-75"
+        className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-700 p-2 text-white shadow-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-75"
         aria-label="Open menu"
       >
         <svg
@@ -51,7 +51,7 @@ const HamburgerMenu: React.FC = () => {
 
       {/* Menu Content */}
       <div
-        className={`absolute top-full right-0 mt-2 w-48 origin-top-right transform rounded-md bg-green-800 shadow-xl transition-all duration-300 ease-in-out ${
+        className={`absolute top-full right-0 mt-2 w-48 origin-top-right transform rounded-md bg-blue-800 shadow-xl transition-all duration-300 ease-in-out ${
           isOpen
             ? "scale-100 opacity-100"
             : "scale-95 opacity-0 pointer-events-none"
@@ -61,12 +61,12 @@ const HamburgerMenu: React.FC = () => {
           {isLoggedIn ? (
             <button
               onClick={handleLogout}
-              className="block w-full px-4 py-2 text-left text-sm text-red-300 hover:bg-green-700 hover:text-white"
+              className="block w-full px-4 py-2 text-center text-sm text-white hover:bg-blue-700 hover:text-white"
             >
               Logout
             </button>
           ) : (
-            <span className="block w-full px-4 py-2 text-left text-sm text-green-400">
+            <span className="block w-full px-4 py-2 text-center text-sm text-blue-400">
               Not logged in
             </span>
           )}
