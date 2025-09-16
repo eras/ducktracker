@@ -29,7 +29,7 @@ pub fn generate_metrics(state: &State, sse_counter: u64, start_time: &Instant) -
     lines.push(format!("ducktracker_open_sse_streams {}", sse_counter));
 
     // --- Points ---
-    let ducktracker_total_points: usize = state.iter_sessions().map(|s| s.locations.len()).sum();
+    let ducktracker_total_points: usize = state.iter_sessions().map(|s| s.locations().len()).sum();
     lines.push(
         "# HELP ducktracker_total_points Total number of location points in memory.".to_string(),
     );
@@ -49,7 +49,7 @@ pub fn generate_metrics(state: &State, sse_counter: u64, start_time: &Instant) -
 
     let ducktracker_private_tags: HashSet<_> = state
         .iter_sessions()
-        .flat_map(|s| s.tags.0.iter())
+        .flat_map(|s| s.tags().0.iter())
         .filter(|t| !t.is_public())
         .map(|t| &t.name)
         .collect();

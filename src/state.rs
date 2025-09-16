@@ -22,16 +22,47 @@ pub enum Error {
 }
 
 /// Represents a single tracking session. This data is stored in memory.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Builder)]
 pub struct Session {
-    pub session_id: models::SessionId,
-    pub locations: VecDeque<Location>,
-    pub expires_at: DateTime<Utc>,
-    pub fetch_id: models::FetchId,
-    pub tags: models::TagsAux,
-    pub max_points: usize,
+    #[builder(required)]
+    session_id: models::SessionId,
+    #[builder(required)]
+    locations: VecDeque<Location>,
+    #[builder(required)]
+    expires_at: DateTime<Utc>,
+    #[builder(required)]
+    fetch_id: models::FetchId,
+    #[builder(required)]
+    tags: models::TagsAux,
+    #[builder(required)]
+    max_points: usize,
 }
 
+impl Session {
+    pub fn session_id(&self) -> &models::SessionId {
+        &self.session_id
+    }
+
+    pub fn locations(&self) -> &VecDeque<Location> {
+        &self.locations
+    }
+
+    pub fn expires_at(&self) -> DateTime<Utc> {
+        self.expires_at
+    }
+
+    pub fn fetch_id(&self) -> &models::FetchId {
+        &self.fetch_id
+    }
+
+    pub fn tags(&self) -> &models::TagsAux {
+        &self.tags
+    }
+
+    pub fn max_points(&self) -> usize {
+        self.max_points
+    }
+}
 pub struct State {
     sessions: HashMap<models::SessionId, Session>,
     session_added: Arc<Notify>,
