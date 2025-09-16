@@ -85,9 +85,7 @@ pub fn read_colon_separated_file<P: AsRef<Path>>(path: P) -> io::Result<HashMap<
         } else {
             // Optionally, handle malformed lines (e.g., log a warning, skip, or return an error).
             // For this implementation, we skip them silently to be permissive.
-            eprintln!(
-                "Warning: Skipping malformed line (no colon found): '{line}'"
-            );
+            eprintln!("Warning: Skipping malformed line (no colon found): '{line}'");
         }
     }
 
