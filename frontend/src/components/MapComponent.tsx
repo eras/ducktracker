@@ -33,8 +33,13 @@ const MapComponent: React.FC = () => {
   const polylinesRef = useRef<L.LayerGroup | null>(null); // Reference for the trace lines
   const clientLocationMarkerRef = useRef<L.Marker | null>(null);
   const isFirstUpdateRef = useRef(true); // Used for initial map bounds/centering
-  const { fetches, selectedTags, showClientLocation, clientLocation } =
-    useAppStore();
+  const {
+    fetches,
+    selectedTags,
+    showClientLocation,
+    clientLocation,
+    showTraces,
+  } = useAppStore();
   const { serverTime } = useProtocolStore(); // Get serverTime from protocol store
   const throttledFetches = useThrottle(fetches, 1000);
 
@@ -83,25 +88,28 @@ const MapComponent: React.FC = () => {
       const isFiltered = selectedTags.size > 0 && !hasSelectedTag;
 
       if (!isFiltered) {
-        for (let i = 0; i < fetch.locations.length - 1; i++) {
-          const loc1 = fetch.locations[i];
-          const loc2 = fetch.locations[i + 1];
+        if (showTraces) {
+          // Render polyline segments with fading effect
+          for (let i = 0; i < fetch.locations.length - 1; i++) {
+            const loc1 = fetch.locations[i];
+            const loc2 = fetch.locations[i + 1];
 
-          const ageSeconds = Math.max(0, serverTime - loc2.time);
+            const ageSeconds = Math.max(0, serverTime - loc2.time);
 
-          let factor = Math.min(1, ageSeconds / MAX_AGE_FADE_SECONDS);
+            let factor = Math.min(1, ageSeconds / MAX_AGE_FADE_SECONDS);
 
-          const segmentColor = interpolateColor(
-            START_COLOR_RGBA,
-            END_COLOR_RGBA,
-            factor,
-          );
+            const segmentColor = interpolateColor(
+              START_COLOR_RGBA,
+              END_COLOR_RGBA,
+              factor,
+            );
 
-          const segmentPolyline = L.polyline([loc1.latlon, loc2.latlon], {
-            color: segmentColor,
-            weight: 3,
-          });
-          polylinesRef.current?.addLayer(segmentPolyline);
+            const segmentPolyline = L.polyline([loc1.latlon, loc2.latlon], {
+              color: segmentColor,
+              weight: 3,
+            });
+            polylinesRef.current?.addLayer(segmentPolyline);
+          }
         }
 
         // Render markers for trace end points
@@ -170,6 +178,7 @@ const MapComponent: React.FC = () => {
     showClientLocation,
     clientLocation,
     serverTime,
+    showTraces,
   ]); // Add serverTime to dependencies
 
   return <div ref={mapContainerRef} className="w-full h-full z-0" />;

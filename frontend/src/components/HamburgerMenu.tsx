@@ -12,6 +12,8 @@ const HamburgerMenu: React.FC = () => {
   const toggleClientLocation = useAppStore(
     (state) => state.toggleClientLocation,
   );
+  const showTraces = useAppStore((state) => state.showTraces);
+  const toggleShowTraces = useAppStore((state) => state.toggleShowTraces);
 
   const handleLogout = () => {
     disconnect();
@@ -21,6 +23,11 @@ const HamburgerMenu: React.FC = () => {
 
   const handleToggleLocation = () => {
     toggleClientLocation();
+    setIsOpen(false);
+  };
+
+  const handleToggleShowTraces = () => {
+    toggleShowTraces();
     setIsOpen(false);
   };
 
@@ -90,6 +97,14 @@ const HamburgerMenu: React.FC = () => {
             {showClientLocation
               ? "Disable Location Tracking"
               : "Enable Location Tracking"}
+          </button>
+
+          {/* Trace Display Toggle */}
+          <button
+            onClick={handleToggleShowTraces}
+            className="block w-full px-4 py-2 text-center text-sm text-white hover:bg-blue-700 hover:text-white"
+          >
+            {showTraces ? "Hide track traces" : "Show track traces"}
           </button>
           {/* Add more menu items here if needed */}
         </div>

@@ -8,6 +8,7 @@ interface AppState {
   fetches: Fetches;
   tags: Set<string>;
   customTags: Set<string>;
+
   addTags: (tags: Set<string>) => void;
   toggleTag: (tag: string) => void;
   addCustomTag: (tag: string) => void;
@@ -18,11 +19,15 @@ interface AppState {
   toggleClientLocation: () => void;
   setClientLocation: (location: L.LatLngTuple | null) => void;
   disableClientLocationPersisted: () => void; // Action to disable and persist (e.g., on permission denied)
+
+  showTraces: boolean;
+  toggleShowTraces: () => void;
 }
 
 const CUSTOM_TAGS_KEY = "customTags";
 const SELECTED_TAGS_KEY = "selectedTags";
 const SHOW_CLIENT_LOCATION_KEY = "showClientLocation";
+const SHOW_TRACES_KEY = "showTraces";
 
 // Helper function for localStorage
 const getStoredTags = (): Set<string> => {
@@ -57,6 +62,16 @@ const getStoredShowClientLocation = (): boolean => {
   }
 };
 
+const getStoredShowTraces = (): boolean => {
+  try {
+    const stored = localStorage.getItem(SHOW_TRACES_KEY);
+    return stored ? JSON.parse(stored) : true;
+  } catch (e) {
+    console.error("Failed to load showTraces from localStorage", e);
+    return false;
+  }
+};
+
 const saveTagsToStorage = (tags: Set<string>) => {
   try {
     localStorage.setItem(CUSTOM_TAGS_KEY, JSON.stringify([...tags]));
@@ -78,6 +93,14 @@ const saveShowClientLocationToStorage = (value: boolean) => {
     localStorage.setItem(SHOW_CLIENT_LOCATION_KEY, JSON.stringify(value));
   } catch (e) {
     console.error("Failed to save showClientLocation to localStorage", e);
+  }
+};
+
+const saveShowTracesToStorage = (value: boolean) => {
+  try {
+    localStorage.setItem(SHOW_TRACES_KEY, JSON.stringify(value));
+  } catch (e) {
+    console.error("Failed to save showTraces to localStorage", e);
   }
 };
 
@@ -117,6 +140,7 @@ const { pub: urlPubTags, priv: urlPrivTags } = parseUrl(window.location.href);
 const initialStoredSelectedTags = getSelectedTags();
 const initialStoredCustomTags = getStoredTags();
 const initialStoredShowClientLocation = getStoredShowClientLocation();
+const initialStoredShowTraces = getStoredShowTraces();
 
 // Combine stored tags with URL tags
 const combinedInitialSelectedTags = union(
@@ -145,6 +169,7 @@ export const useAppStore = create<AppState>((set) => ({
   customTags: combinedInitialCustomTags,
   // --- New client location initial state ---
   showClientLocation: initialStoredShowClientLocation,
+  showTraces: initialStoredShowTraces,
   clientLocation: null,
 
   toggleTag: (tag: string) =>
@@ -206,6 +231,16 @@ export const useAppStore = create<AppState>((set) => ({
 
   setClientLocation: (location: L.LatLngTuple | null) =>
     set({ clientLocation: location }),
+
+  toggleShowTraces: () =>
+    set((state) => {
+      console.log(`Toggling ${state.showTraces} to ${!state.showTraces}`);
+      const newShowTraces = !state.showTraces;
+      saveShowTracesToStorage(newShowTraces);
+      return {
+        showTraces: newShowTraces,
+      };
+    }),
 
   disableClientLocationPersisted: () =>
     set(() => {
