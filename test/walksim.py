@@ -67,6 +67,7 @@ def parse_api_response_lines(response_text: str) -> list[str]:
 def generate_random_tags(
     public_tags: list[str],
     private_tags: list[str],
+    custom_tags: list[str],
     num_public: int = 2,
     num_private: int = 1,
 ) -> str:
@@ -77,7 +78,7 @@ def generate_random_tags(
     selected_private = random.sample(
         [f"private:{x}" for x in private_tags], min(num_private, len(private_tags))
     )
-    all_selected_tags = selected_public + selected_private
+    all_selected_tags = selected_public + selected_private + custom_tags
     random.shuffle(all_selected_tags)  # Mix them up
     return ",".join(all_selected_tags)
 
@@ -285,6 +286,12 @@ def main() -> None:
         help="Private tags to select from",
     )
     parser.add_argument(
+        "--custom-tags",
+        type=str,
+        default="",
+        help="Custom tags to add to each session",
+    )
+    parser.add_argument(
         "--verbose",
         "-v",
         action="store_true",
@@ -305,6 +312,7 @@ def main() -> None:
     preload: int | None = args.preload if args.preload else None
     public_tags: list[str] = args.public_tags.split(",")
     private_tags: list[str] = args.private_tags.split(",")
+    custom_tags: list[str] = args.custom_tags.split(",")
     verbose: bool = args.verbose
 
     # Register the SIGINT handler
@@ -313,8 +321,8 @@ def main() -> None:
     session_id: Optional[str] = None  # Initialize session_id to None
 
     try:
-        # 1. Generate random tags for the session
-        selected_tags_str = generate_random_tags(public_tags, private_tags)
+        # 1. Generate random tags for the session (custom_tags is combined then to those)
+        selected_tags_str = generate_random_tags(public_tags, private_tags, custom_tags)
 
         # 2. Create the tracking session
         temp_session_id, _share_link, _share_id = create_session(
