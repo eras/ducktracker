@@ -46,25 +46,27 @@ let processUpdates = (
     } else {
       if ("add_fetch" in change) {
         let newTags = new Set([...change.add_fetch.public]);
-        Object.entries(change.add_fetch.tags).forEach(([fetch_id, tags]) => {
-          if (tags) {
-            let fetch_index = parseInt(fetch_id);
-            let fetch =
-              fetch_index in state.fetches
-                ? state.fetches[fetch_index]
-                : {
-                    // construct new Fetch
-                    locations: [],
-                    tags: new Set<string>(),
-                    max_points: change.add_fetch.max_points,
-                  };
-            fetch.tags = union(fetch.tags, tags);
-            for (const tag of tags) {
-              newTags.add(tag);
+        Object.entries(change.add_fetch.fetches).forEach(
+          ([fetch_id, fetch_in]) => {
+            if (fetch_in) {
+              let fetch_index = parseInt(fetch_id);
+              let fetch =
+                fetch_index in state.fetches
+                  ? state.fetches[fetch_index]
+                  : {
+                      // construct new Fetch
+                      locations: [],
+                      tags: new Set<string>(),
+                      max_points: fetch_in.max_points,
+                    };
+              fetch.tags = union(fetch.tags, fetch_in.tags);
+              for (const tag of fetch_in.tags) {
+                newTags.add(tag);
+              }
+              state.fetches[fetch_index] = fetch;
             }
-            state.fetches[fetch_index] = fetch;
-          }
-        });
+          },
+        );
         state.publicTags = new Set([
           ...state.publicTags,
           ...change.add_fetch.public,

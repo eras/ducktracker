@@ -496,20 +496,26 @@ impl Update {
 
 #[derive(Debug, Serialize, Clone, TS)]
 #[ts(export)]
+pub struct Fetch {
+    // Only includes the tags the client has subscribed to
+    pub tags: Tags,
+
+    // Max number of points the client should persist for a fetch
+    pub max_points: usize,
+}
+
+#[derive(Debug, Serialize, Clone, TS)]
+#[ts(export)]
 pub enum UpdateChange {
     // Reset all client state
     #[serde(rename = "reset")]
     Reset,
     #[serde(rename = "add_fetch")]
     AddFetch {
-        // Only includes the tags the client has subscribed to
-        tags: HashMap<FetchId, Tags>,
+        fetches: HashMap<FetchId, Fetch>,
 
         // There are these new public tags
         public: Tags,
-
-        // Max number of points the client should persist for this fetch
-        max_points: usize,
     },
     #[serde(rename = "add")]
     Add {
@@ -529,26 +535,27 @@ impl UpdateChange {
     ) -> Option<UpdateChange> {
         match self {
             Self::Reset => Some(self.clone()),
-            Self::AddFetch {
-                tags,
-                public,
-                max_points,
-            } => {
-                let tags = tags
+            Self::AddFetch { fetches, public } => {
+                let fetches = fetches
                     .into_iter()
-                    .filter_map(|(fetch_id, tags)| {
-                        let shared_tags = &tags & filter_tags;
+                    .filter_map(|(fetch_id, fetch)| {
+                        let shared_tags = &fetch.tags & filter_tags;
                         if shared_tags.len() > 0 {
-                            Some((fetch_id, shared_tags))
+                            Some((
+                                fetch_id,
+                                Fetch {
+                                    tags: shared_tags,
+                                    ..fetch
+                                },
+                            ))
                         } else {
                             None
                         }
                     })
                     .collect();
                 Some(UpdateChange::AddFetch {
-                    tags,
+                    fetches,
                     public: public.clone(),
-                    max_points,
                 })
             }
             Self::Add { points } => {

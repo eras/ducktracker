@@ -546,8 +546,8 @@ impl State {
             tags: tags.clone(),
             is_heartbeat: false,
         };
-        let mut new_tags = HashMap::new();
-        new_tags.insert(fetch_id, tags);
+        let mut fetches = HashMap::new();
+        fetches.insert(fetch_id, models::Fetch { tags, max_points });
         let meta = models::UpdateMeta {
             server_time: models::TimeUsec(std::time::SystemTime::now()),
             interval: 0u64,
@@ -555,9 +555,8 @@ impl State {
         let update = Update {
             meta,
             changes: [UpdateChange::AddFetch {
-                tags: new_tags,
+                fetches,
                 public: public_tags,
-                max_points,
             }]
             .to_vec(),
         };
@@ -793,14 +792,20 @@ impl Updates {
 
     fn initial_update(&self, tags: models::Tags, state: &State) -> (UpdateContext, Update) {
         let mut changes = [UpdateChange::Reset].to_vec();
-        let fetch_tags: HashMap<models::FetchId, models::Tags> = state
+        let fetches: HashMap<models::FetchId, models::Fetch> = state
             .sessions
             .iter()
             .filter_map(|x| {
                 let session = &x.1;
                 let shared_tags = &session.tags.as_tags() & &tags;
                 if shared_tags.len() > 0 {
-                    Some((session.fetch_id, shared_tags))
+                    Some((
+                        session.fetch_id,
+                        models::Fetch {
+                            tags: shared_tags,
+                            max_points: session.max_points,
+                        },
+                    ))
                 } else {
                     None
                 }
@@ -813,13 +818,12 @@ impl Updates {
             .map(|x| (x.1.fetch_id, x.1.locations.iter().cloned().collect()))
             .collect();
         changes.push(UpdateChange::AddFetch {
-            tags: fetch_tags,
+            fetches,
             public: state
                 .public_tags
                 .iter()
                 .map(|(tag, _)| tag.clone())
                 .collect(),
-            max_points: state.max_points,
         });
         changes.push(UpdateChange::Add { points });
         (
