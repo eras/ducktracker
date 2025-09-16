@@ -50,7 +50,7 @@ const MapComponent: React.FC = () => {
     if (!mapContainerRef.current) return;
 
     // Use default view for Helsinki, Finland
-    const map = L.map(mapContainerRef.current).setView(
+    const map = L.map(mapContainerRef.current, { preferCanvas: true }).setView(
       [59.436962, 24.753574],
       12,
     );
