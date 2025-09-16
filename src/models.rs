@@ -329,7 +329,7 @@ impl Tags {
 pub struct Options {
     pub max_points: Option<usize>,
     pub max_point_age: Option<chrono::TimeDelta>,
-    pub persist: bool,
+    pub no_stop: bool,
 }
 
 impl TagsAux {
@@ -392,8 +392,8 @@ impl TagsAux {
                         }
                     } else {
                         match field {
-                            "persist" => {
-                                options.persist = true;
+                            "nostop" => {
+                                options.no_stop = true;
                             }
                             _ => {
                                 // If no keyword specified, default to private tag
@@ -500,7 +500,7 @@ pub struct Fetch {
     // Only includes the tags the client has subscribed to
     pub tags: Tags,
 
-    // Max number of points the client should persist for a fetch
+    // Max number of points the client should no_stop for a fetch
     pub max_points: usize,
 
     // Max age of a location aka point in seconds

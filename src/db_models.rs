@@ -8,7 +8,7 @@ use chrono::{DateTime, TimeDelta, Utc};
 use serde::{Deserialize, Serialize};
 
 /// Represents a session as stored in the database.
-/// Only stores necessary fields for persistence, not volatile location data.
+/// Only stores necessary fields for no_stopence, not volatile location data.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DbSession {
     pub session_id: SessionId,
@@ -18,7 +18,7 @@ pub struct DbSession {
     pub max_points: usize,
     pub max_point_age: Option<TimeDelta>,
     pub reject_data: bool,
-    pub persist: bool,
+    pub no_stop: bool,
 }
 
 impl From<&state::Session> for DbSession {
@@ -32,25 +32,25 @@ impl From<&state::Session> for DbSession {
             max_points: session.max_points(),
             max_point_age: session.max_point_age(),
             reject_data: session.reject_data(),
-            persist: session.persist(),
+            no_stop: session.no_stop(),
         }
     }
 }
 
 impl From<DbSession> for state::Session {
     /// Converts a `DbSession` into a `state::Session`.
-    /// Note: Location data is not persisted, so `locations` will be empty.
+    /// Note: Location data is not no_stoped, so `locations` will be empty.
     fn from(db_session: DbSession) -> Self {
         state::SessionBuilder::new()
             .with_session_id(db_session.session_id)
-            .with_locations(VecDeque::new()) // Location data is not persisted
+            .with_locations(VecDeque::new()) // Location data is not no_stoped
             .with_expires_at(db_session.expires_at)
             .with_fetch_id(db_session.fetch_id)
             .with_tags(db_session.tags)
             .with_max_points(db_session.max_points)
             .with_max_point_age(db_session.max_point_age)
             .with_reject_data(db_session.reject_data)
-            .with_persist(db_session.persist)
+            .with_no_stop(db_session.no_stop)
             .build()
     }
 }

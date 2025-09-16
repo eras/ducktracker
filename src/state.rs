@@ -44,13 +44,13 @@ pub struct Session {
     #[builder(default)]
     added_to_expiration: bool,
 
-    // should we reject new data? Used to provide persist and also deal with https://github.com/bilde2910/Hauk/issues/230
+    // should we reject new data? Used to provide no_stop and also deal with https://github.com/bilde2910/Hauk/issues/230
     #[builder(required)]
     reject_data: bool,
 
     // should the data of this session survive even after stopping it, and let expiration deal with it?
     #[builder(required)]
-    persist: bool,
+    no_stop: bool,
 }
 
 impl Session {
@@ -86,8 +86,8 @@ impl Session {
         self.reject_data
     }
 
-    pub fn persist(&self) -> bool {
-        self.persist
+    pub fn no_stop(&self) -> bool {
+        self.no_stop
     }
 }
 
@@ -299,7 +299,7 @@ impl State {
             max_point_age: options.max_point_age,
             added_to_expiration: false,
             reject_data: false,
-            persist: options.persist,
+            no_stop: options.no_stop,
         };
         log::debug!(
             "Creating new session {} with options {:?} expires at {}",
@@ -470,8 +470,8 @@ impl State {
 
     pub async fn request_remove_session(&mut self, session_id: &models::SessionId) {
         if let Some(session) = self.sessions.get_mut(session_id) {
-            log::debug!("Requested to remove a session: persist={}", session.persist);
-            if session.persist {
+            log::debug!("Requested to remove a session: no_stop={}", session.no_stop);
+            if session.no_stop {
                 session.reject_data = true;
             } else {
                 self.remove_session(session_id).await;

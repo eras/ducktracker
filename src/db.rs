@@ -28,7 +28,7 @@ impl DbClient {
             })?,
         );
 
-        // Establish the connection once and persist it
+        // Establish the connection once and no_stop it
         let conn = Arc::new(Mutex::new(turso_db_client.connect()?));
 
         let client = DbClient {
@@ -56,7 +56,7 @@ impl DbClient {
                     max_points INTEGER NOT NULL,
                     max_point_age TEXT,
                     reject_data BOOL NOT NULL,
-                    persist BOOL NOT NULL
+                    no_stop BOOL NOT NULL
                 )",
                 (),
             )
@@ -71,7 +71,7 @@ impl DbClient {
             .lock()
             .await
             .execute(
-                "INSERT INTO sessions (session_id, expires_at, fetch_id, tags, max_points, max_point_age, reject_data, persist) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                "INSERT INTO sessions (session_id, expires_at, fetch_id, tags, max_points, max_point_age, reject_data, no_stop) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     session.session_id.0.clone(),
                     session.expires_at.to_rfc3339(), // Store DateTime as ISO 8601 string
@@ -80,7 +80,7 @@ impl DbClient {
 		    session.max_points as u64,
 		    session.max_point_age.map(|timedelta: chrono::TimeDelta| utils::format_timedelta(&timedelta)),
 		    session.reject_data,
-		    session.persist,
+		    session.no_stop,
                 ),
             )
             .await
@@ -100,7 +100,7 @@ impl DbClient {
             .lock()
             .await
             .query(
-                "SELECT session_id, expires_at, fetch_id, tags, max_points, max_point_age, reject_data, persist FROM sessions",
+                "SELECT session_id, expires_at, fetch_id, tags, max_points, max_point_age, reject_data, no_stop FROM sessions",
                 (),
             )
             .await
@@ -121,7 +121,7 @@ impl DbClient {
         let max_points_val = row.get::<u64>(4)?;
         let max_point_age_val = row.get::<Option<String>>(5)?;
         let reject_data_val = row.get::<bool>(6)?;
-        let persist_val = row.get::<bool>(6)?;
+        let no_stop_val = row.get::<bool>(6)?;
 
         let session_id = SessionId(session_id_val);
         let expires_at = DateTime::parse_from_rfc3339(&expires_at_val)?.with_timezone(&Utc);
@@ -132,7 +132,7 @@ impl DbClient {
             .map(|x| utils::parse_timedelta(&x))
             .transpose()?;
         let reject_data = reject_data_val;
-        let persist = persist_val;
+        let no_stop = no_stop_val;
 
         Ok(DbSession {
             session_id,
@@ -142,7 +142,7 @@ impl DbClient {
             max_points,
             max_point_age,
             reject_data,
-            persist,
+            no_stop,
         })
     }
 
