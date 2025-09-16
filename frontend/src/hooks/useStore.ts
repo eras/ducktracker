@@ -22,7 +22,7 @@ interface AppState {
 
 const CUSTOM_TAGS_KEY = "customTags";
 const SELECTED_TAGS_KEY = "selectedTags";
-const SHOW_CLIENT_LOCATION_KEY = "showClientLocation"; // New localStorage key
+const SHOW_CLIENT_LOCATION_KEY = "showClientLocation";
 
 // Helper function for localStorage
 const getStoredTags = (): Set<string> => {
@@ -46,7 +46,6 @@ const getSelectedTags = (): Set<string> => {
   }
 };
 
-// New helper function for localStorage
 const getStoredShowClientLocation = (): boolean => {
   try {
     const stored = localStorage.getItem(SHOW_CLIENT_LOCATION_KEY);
@@ -74,7 +73,6 @@ const saveSelectedTagsToStorage = (selectedTags: Set<string>) => {
   }
 };
 
-// New helper function to save showClientLocation to localStorage
 const saveShowClientLocationToStorage = (value: boolean) => {
   try {
     localStorage.setItem(SHOW_CLIENT_LOCATION_KEY, JSON.stringify(value));
@@ -118,7 +116,7 @@ const { pub: urlPubTags, priv: urlPrivTags } = parseUrl(window.location.href);
 // Get initial values from localStorage
 const initialStoredSelectedTags = getSelectedTags();
 const initialStoredCustomTags = getStoredTags();
-const initialStoredShowClientLocation = getStoredShowClientLocation(); // New initial state
+const initialStoredShowClientLocation = getStoredShowClientLocation();
 
 // Combine stored tags with URL tags
 const combinedInitialSelectedTags = union(
@@ -195,7 +193,6 @@ export const useAppStore = create<AppState>((set) => ({
       return { customTags: newCustomTags, selectedTags: newSelectedTags };
     }),
 
-  // --- New client location actions ---
   toggleClientLocation: () =>
     set((state) => {
       const newShowLocation = !state.showClientLocation;

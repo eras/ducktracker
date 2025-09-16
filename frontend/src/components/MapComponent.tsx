@@ -83,7 +83,6 @@ const MapComponent: React.FC = () => {
       const isFiltered = selectedTags.size > 0 && !hasSelectedTag;
 
       if (!isFiltered) {
-        // Render polyline segments with fading effect
         for (let i = 0; i < fetch.locations.length - 1; i++) {
           const loc1 = fetch.locations[i];
           const loc2 = fetch.locations[i + 1];

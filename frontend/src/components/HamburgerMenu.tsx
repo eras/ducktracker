@@ -14,15 +14,14 @@ const HamburgerMenu: React.FC = () => {
   );
 
   const handleLogout = () => {
-    disconnect(); // Terminate SSE session
-    clearCredentials(); // Clear persisted username and password
-    setIsOpen(false); // Close the menu
+    disconnect();
+    clearCredentials();
+    setIsOpen(false);
   };
 
-  // The logout button should only be visible if a user is logged in
   const handleToggleLocation = () => {
     toggleClientLocation();
-    setIsOpen(false); // Close the menu after action
+    setIsOpen(false);
   };
 
   // The logout button should only be visible if a user is logged in
