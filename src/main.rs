@@ -67,9 +67,13 @@ struct Config {
     #[arg(long, default_value = "duck")]
     default_tag: String,
 
-    /// Maximum number of points a share can have. Mostly for to client peformance purposes.
+    /// Maximum number of points a share can have. Mostly for to client peformance purposes. Client cannot exceed this.
     #[arg(long, default_value = "1000")]
     max_points: usize,
+
+    /// Default number of points a share can have. Mostly for to client peformance purposes.
+    #[arg(long, default_value = "200")]
+    default_points: usize,
 
     /// Heart beat interval; changes will be reported to clients latest by this delay, and empty heartbeat messages are sent with this interval
     #[arg(long, default_value = "1000ms")]
@@ -128,6 +132,7 @@ async fn real_main() -> anyhow::Result<()> {
         &config.scheme,
         config.server_name.as_deref(),
         config.max_points,
+        config.default_points,
         config.update_interval.into(),
         parsed_box_coords, // PASS THE PARSED BOX COORDINATES
         config.prometheus_user,

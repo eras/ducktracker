@@ -124,6 +124,8 @@ pub struct State {
 
     max_points: usize,
 
+    default_points: usize,
+
     pub update_interval: Duration,
 
     pub box_coords: Option<BoxCoords>,
@@ -139,6 +141,7 @@ impl State {
         http_scheme: &str,
         server_name: Option<&str>,
         max_points: usize,
+        default_points: usize,
         update_interval: Duration,
         box_coords: Option<BoxCoords>,
         prometheus_user: Option<String>,
@@ -167,6 +170,7 @@ impl State {
             http_scheme: http_scheme.to_string(),
             server_name: server_name.map(|x| x.to_string()),
             max_points,
+            default_points,
             update_interval,
             box_coords,
             prometheus_user,
@@ -279,6 +283,11 @@ impl State {
             });
         }
 
+        let max_points = std::cmp::min(
+            self.max_points,
+            std::cmp::max(1usize, options.max_points.unwrap_or(self.default_points)),
+        );
+
         // Create a new session and store it in the DashMap.
         let new_session = Session {
             session_id: session_id.clone(),
@@ -286,7 +295,7 @@ impl State {
             expires_at,
             fetch_id,
             tags: tags_aux.clone(),
-            max_points: options.max_points.unwrap_or(self.max_points),
+            max_points,
             max_point_age: options.max_point_age,
             added_to_expiration: false,
             reject_data: false,
