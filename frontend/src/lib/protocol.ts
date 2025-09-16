@@ -58,6 +58,7 @@ let processUpdates = (
                       locations: [],
                       tags: new Set<string>(),
                       max_points: fetch_in.max_points,
+                      max_point_age: fetch_in.max_point_age,
                     };
               fetch.tags = union(fetch.tags, fetch_in.tags);
               for (const tag of fetch_in.tags) {
@@ -98,6 +99,22 @@ let processUpdates = (
       }
     }
   }
+
+  // TODO: maybe we could just do this once a second from a timer?
+  // Expire all data points with data expiration
+  const now = new Date().getTime() / 1000.0;
+  Object.entries(state.fetches).forEach(([_fetch_id, fetch]) => {
+    if (fetch && fetch.max_point_age !== null) {
+      let deadline = now - fetch.max_point_age;
+      while (
+        fetch.locations.length > 0 && // acceptable to leave no data..
+        fetch.locations[0].time < deadline // and the data is expired
+      ) {
+        fetch.locations.shift();
+      }
+    }
+  });
+
   return state;
 };
 

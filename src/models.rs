@@ -502,6 +502,9 @@ pub struct Fetch {
 
     // Max number of points the client should persist for a fetch
     pub max_points: usize,
+
+    // Max age of a location aka point in seconds
+    pub max_point_age: Option<f64>,
 }
 
 #[derive(Debug, Serialize, Clone, TS)]

@@ -307,8 +307,13 @@ impl State {
             .insert(session_id.clone(), new_session.clone());
         self.session_added.notify_waiters();
         self.add_public_tags_for_session(&new_session);
-        self.add_fetch(fetch_id, tags_aux, new_session.max_points)
-            .await;
+        self.add_fetch(
+            fetch_id,
+            tags_aux,
+            new_session.max_points,
+            new_session.max_point_age,
+        )
+        .await;
 
         // Persist the new session to the database asynchronously
         let db_client = self.db_client.clone();
@@ -538,6 +543,7 @@ impl State {
         fetch_id: models::FetchId,
         tags_aux: models::TagsAux,
         max_points: usize,
+        max_point_age: Option<chrono::TimeDelta>,
     ) {
         let public_tags = tags_aux.public_tags();
         let tags: models::Tags = tags_aux.into();
@@ -547,7 +553,15 @@ impl State {
             is_heartbeat: false,
         };
         let mut fetches = HashMap::new();
-        fetches.insert(fetch_id, models::Fetch { tags, max_points });
+        let max_point_age = max_point_age.map(|x| x.num_seconds() as f64);
+        fetches.insert(
+            fetch_id,
+            models::Fetch {
+                tags,
+                max_points,
+                max_point_age,
+            },
+        );
         let meta = models::UpdateMeta {
             server_time: models::TimeUsec(std::time::SystemTime::now()),
             interval: 0u64,
@@ -804,6 +818,7 @@ impl Updates {
                         models::Fetch {
                             tags: shared_tags,
                             max_points: session.max_points,
+                            max_point_age: session.max_point_age.map(|x| x.num_seconds() as f64),
                         },
                     ))
                 } else {

@@ -24,6 +24,7 @@ export interface Fetch {
   locations: Array<ParsedLocation>;
   tags: Set<Tag>;
   max_points: number;
+  max_point_age: number | null;
 }
 
 export type Fetches = { [key in FetchId]: Fetch };
