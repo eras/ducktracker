@@ -1,5 +1,6 @@
 use crate::db_models::DbSession;
 use crate::models::{FetchId, SessionId, TagsAux};
+use crate::utils;
 use anyhow::{Context as AnyhowContext, Result};
 use chrono::{DateTime, Utc};
 use std::path::{Path, PathBuf};
@@ -52,7 +53,8 @@ impl DbClient {
                     expires_at TEXT NOT NULL,
                     fetch_id INTEGER NOT NULL,
                     tags TEXT NOT NULL,
-                    max_points INTEGER NOT NULL
+                    max_points INTEGER NOT NULL,
+                    max_point_age TEXT
                 )",
                 (),
             )
@@ -67,13 +69,14 @@ impl DbClient {
             .lock()
             .await
             .execute(
-                "INSERT INTO sessions (session_id, expires_at, fetch_id, tags, max_points) VALUES (?, ?, ?, ?, ?)",
+                "INSERT INTO sessions (session_id, expires_at, fetch_id, tags, max_points, max_point_age) VALUES (?, ?, ?, ?, ?, ?)",
                 (
                     session.session_id.0.clone(),
                     session.expires_at.to_rfc3339(), // Store DateTime as ISO 8601 string
                     session.fetch_id.0,
                     tags_json,
 		    session.max_points as u64,
+		    session.max_point_age.map(|timedelta: chrono::TimeDelta| utils::format_timedelta(&timedelta)),
                 ),
             )
             .await
@@ -93,7 +96,7 @@ impl DbClient {
             .lock()
             .await
             .query(
-                "SELECT session_id, expires_at, fetch_id, tags, max_points FROM sessions",
+                "SELECT session_id, expires_at, fetch_id, tags, max_points, max_point_age FROM sessions",
                 (),
             )
             .await
@@ -112,11 +115,15 @@ impl DbClient {
         let fetch_id_val = row.get::<i32>(2)?;
         let tags_val = row.get::<String>(3)?;
         let max_points_val = row.get::<u64>(4)?;
+        let max_point_age_val = row.get::<Option<String>>(5)?;
         let session_id = SessionId(session_id_val);
         let expires_at = DateTime::parse_from_rfc3339(&expires_at_val)?.with_timezone(&Utc);
         let fetch_id = FetchId(u32::try_from(fetch_id_val)?);
         let tags: TagsAux = serde_json::from_str(&tags_val)?;
         let max_points = max_points_val.try_into()?;
+        let max_point_age = max_point_age_val
+            .map(|x| utils::parse_timedelta(&x))
+            .transpose()?;
 
         Ok(DbSession {
             session_id,
@@ -124,6 +131,7 @@ impl DbClient {
             fetch_id,
             tags,
             max_points,
+            max_point_age,
         })
     }
 

@@ -13,6 +13,7 @@ use std::time::Duration;
 use std::{collections::HashMap, pin::Pin, sync::Arc};
 use tokio::sync::{Mutex, Notify, broadcast};
 use tokio::task;
+use typesafe_builder::*;
 
 const MAX_TOKENS: usize = 100000;
 
@@ -36,6 +37,12 @@ pub struct Session {
     tags: models::TagsAux,
     #[builder(required)]
     max_points: usize,
+    #[builder(required)]
+    max_point_age: Option<chrono::TimeDelta>,
+
+    // is the oldest data of this Session added to the data expiration structure?
+    #[builder(default)]
+    added_to_expiration: bool,
 }
 
 impl Session {
@@ -62,13 +69,24 @@ impl Session {
     pub fn max_points(&self) -> usize {
         self.max_points
     }
+
+    pub fn max_point_age(&self) -> Option<chrono::TimeDelta> {
+        self.max_point_age
+    }
 }
+
+type Expiration = BinaryHeap<Reverse<(DateTime<Utc>, models::SessionId)>>;
+
 pub struct State {
     sessions: HashMap<models::SessionId, Session>,
     session_added: Arc<Notify>,
 
     // A fast way to find the oldest expiring session
-    session_expirations: BinaryHeap<Reverse<(DateTime<Utc>, models::SessionId)>>,
+    session_expirations: Expiration,
+
+    // A fast way to find the oldest expiring datum
+    data_expirations: Expiration,
+    data_expire_added: Arc<Notify>,
 
     pub updates: Updates,
     public_tags: HashMap<models::Tag, usize>, // reference count
@@ -121,7 +139,9 @@ impl State {
             updates,
             sessions: HashMap::new(),
             session_added: Arc::new(Notify::new()),
-            session_expirations: BinaryHeap::new(),
+            session_expirations: Expiration::new(),
+            data_expirations: Expiration::new(),
+            data_expire_added: Arc::new(Notify::new()),
             next_fetch_id: models::FetchId::default(),
             public_tags: HashMap::new(),
             users,
@@ -144,6 +164,7 @@ impl State {
         let arc_state = Arc::new(Mutex::new(state));
 
         tokio::spawn(Self::remove_expired_sessions_task(arc_state.clone()));
+        tokio::spawn(Self::remove_expired_data_task(arc_state.clone()));
 
         Ok(arc_state)
     }
@@ -250,7 +271,16 @@ impl State {
             fetch_id,
             tags: tags_aux.clone(),
             max_points: options.max_points.unwrap_or(self.max_points),
+            max_point_age: options.max_point_age,
+            added_to_expiration: false,
         };
+        log::debug!(
+            "Creating new session {} with options {:?} expires at {}",
+            &session_id,
+            &options,
+            &expires_at,
+        );
+
         self.session_expirations.push(Reverse((
             new_session.expires_at,
             new_session.session_id.clone(),
@@ -277,26 +307,15 @@ impl State {
     async fn remove_expired_sessions_task(state: Arc<Mutex<State>>) {
         let session_added = state.lock().await.session_added.clone();
         loop {
-            let next_sleep_duration;
-            {
+            let next_sleep_duration = {
                 let mut state = state.lock().await;
 
                 state.remove_expired_sessions().await;
 
-                if let Some(Reverse((expires_at, _))) = state.session_expirations.peek() {
-                    let now = Utc::now();
+                get_sleep_duration(&state.session_expirations)
+            };
 
-                    next_sleep_duration = expires_at
-                        .signed_duration_since(now)
-                        .to_std()
-                        // Handle the extremely unlikely error case reasonably?
-                        .unwrap_or(Duration::from_secs(1));
-                } else {
-                    next_sleep_duration = Duration::from_secs(3600);
-                }
-            }
-
-            log::debug!("Sleeping for {next_sleep_duration:?}");
+            log::debug!("remove_expired_sessions_task: Sleeping for {next_sleep_duration:?}");
 
             #[rustfmt::skip]
             tokio::select! {
@@ -330,6 +349,91 @@ impl State {
                 break;
             }
         }
+    }
+
+    // I have sinned, I just copypasted the previous function instead of figuring out how to merge them more
+    async fn remove_expired_data_task(state: Arc<Mutex<State>>) {
+        let data_expire_added = state.lock().await.data_expire_added.clone();
+        loop {
+            let next_sleep_duration = {
+                let mut state = state.lock().await;
+
+                state.remove_expired_data().await;
+
+                get_sleep_duration(&state.data_expirations)
+            };
+
+            log::debug!("remove_expired_data_task: Sleeping for {next_sleep_duration:?}");
+
+            #[rustfmt::skip]
+            tokio::select! {
+		_ = tokio::time::sleep(next_sleep_duration) => {
+                    // Sleep finished, loop to re-process expired datas
+		}
+		_ = data_expire_added.notified() => {
+		    // A new data was added/updated that might be earlier, or an existing
+		    // earliest data was removed. Re-loop immediately to re-evaluate the next
+		    // sleep time.
+		}
+            }
+        }
+    }
+
+    // Walks the data_expirations BinaryHeap and finds candidates for sessions with expired data;
+    // invokes expire_data on such sessions
+    async fn remove_expired_data(&mut self) {
+        let now = Utc::now();
+        loop {
+            if let Some(Reverse((expires_at, session_id))) = self.data_expirations.peek() {
+                if expires_at <= &now {
+                    let session_id = session_id.clone();
+                    self.data_expirations.pop();
+                    if self.sessions.contains_key(&session_id) {
+                        log::debug!("Removing expired data for {session_id}");
+                        let _ignored = self.expire_data(&session_id, now).await;
+                    }
+                } else {
+                    break;
+                }
+            } else {
+                break;
+            }
+        }
+    }
+
+    // Expire data that is older than now - session.max_point_age
+    async fn expire_data(
+        &mut self,
+        session_id: &models::SessionId,
+        now: DateTime<Utc>,
+    ) -> anyhow::Result<()> {
+        let session = match self.sessions.get_mut(session_id) {
+            Some(s) => s,
+            None => return Err(anyhow::anyhow!("No such session")),
+        };
+        if let Some(max_point_age) = session.max_point_age {
+            let deadline = now - max_point_age;
+            while let Some(front) = session.locations.front() {
+                let location_time =
+                    DateTime::<Utc>::from_timestamp_micros((front.time * 1000000f64) as i64)
+                        .ok_or(anyhow::anyhow!(
+                            "Failed to convert location timestamp to DateTime"
+                        ))?;
+                if location_time < deadline {
+                    session.locations.pop_front();
+                    session.added_to_expiration = false;
+                } else {
+                    break;
+                }
+            }
+
+            State::add_data_expiration(
+                &mut self.data_expirations,
+                session,
+                &mut self.data_expire_added,
+            );
+        }
+        Ok(())
     }
 
     pub async fn remove_session(&mut self, session_id: &models::SessionId) {
@@ -471,11 +575,14 @@ impl State {
         locs.push_back(new_location.clone());
         if locs.len() > session.max_points {
             locs.pop_front();
+            session.added_to_expiration = false;
         }
 
-        // if sessions.locations.len() > state.max_points {
-        //     //sessions.locations.
-        // }
+        State::add_data_expiration(
+            &mut self.data_expirations,
+            session,
+            &mut self.data_expire_added,
+        );
 
         let mut points = std::collections::HashMap::new();
         points.insert(session.fetch_id, [new_location].to_vec());
@@ -498,6 +605,48 @@ impl State {
         self.updates.send_update(context, update);
 
         Ok(())
+    }
+
+    // If there is more than one point of data in session, and we haven't added it to
+    // data_expirations, do that, and notfiy the expiration task we've done it.
+    fn add_data_expiration(
+        data_expirations: &mut Expiration,
+        session: &mut Session,
+        notify: &mut Arc<Notify>,
+    ) {
+        if let Some(max_point_age) = session.max_point_age {
+            if !session.added_to_expiration {
+                if let Some(front) = session.locations.front() {
+                    if !session.locations.is_empty() {
+                        let expiration = front.time_timedelta() + max_point_age;
+                        log::debug!(
+                            "Added data to be expired for session {}: {}+{}={}",
+                            &session.session_id,
+                            front.time_timedelta(),
+                            &max_point_age,
+                            &expiration
+                        );
+                        data_expirations.push(Reverse((expiration, session.session_id.clone())));
+                        session.added_to_expiration = true;
+                        notify.notify_waiters();
+                    }
+                }
+            }
+        }
+    }
+}
+
+fn get_sleep_duration(expirations: &Expiration) -> Duration {
+    if let Some(Reverse((expires_at, _))) = expirations.peek() {
+        let now = Utc::now();
+
+        expires_at
+            .signed_duration_since(now)
+            .to_std()
+            // Handle the extremely unlikely error case reasonably?
+            .unwrap_or(Duration::from_secs(1))
+    } else {
+        Duration::from_secs(3600)
     }
 }
 

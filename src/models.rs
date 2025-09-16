@@ -17,7 +17,13 @@ pub struct Location {
     pub spd: Option<f64>,
     #[serde(rename = "prv")]
     pub provider: u64, // location provider, seems to be 0 or 1, probably coarse vs fine
-    pub time: f64,
+    pub time: f64, // unix epoch
+}
+
+impl Location {
+    pub fn time_timedelta(&self) -> chrono::DateTime<chrono::Utc> {
+        chrono::DateTime::<chrono::Utc>::from_timestamp_micros((self.time * 1000000f64) as i64).expect("Seems we have an invalid timestamp here. We should actually convert time to chrono::DateTime as soon as we get it, so we can ignore this particular case later")
+    }
 }
 
 #[derive(TS)]
@@ -319,15 +325,17 @@ impl Tags {
     }
 }
 
+#[derive(Default, Debug)]
 pub struct Options {
     pub max_points: Option<usize>,
+    pub max_point_age: Option<chrono::TimeDelta>,
 }
 
 impl TagsAux {
     pub fn parse_share_id(share_id: &Option<String>) -> anyhow::Result<(Self, Options)> {
         use anyhow::Context;
 
-        let mut options = Options { max_points: None };
+        let mut options = Options::default();
 
         match share_id {
             None => Ok((
@@ -364,6 +372,15 @@ impl TagsAux {
                                     )
                                 })?;
                                 options.max_points = Some(parsed_points);
+                            }
+                            "expire" => {
+                                let parsed_expire = utils::parse_timedelta(value).with_context(|| {
+                                    format!(
+                                        "Invalid value for 'expire' keyword: '{}' is not a time delta (e.g. 10h or 10m10s)",
+                                        value
+                                    )
+                                })?;
+                                options.max_point_age = Some(parsed_expire);
                             }
                             _ => {
                                 return Err(anyhow::anyhow!(

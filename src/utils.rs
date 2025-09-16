@@ -99,3 +99,35 @@ pub fn generate_id() -> String {
         .map(char::from)
         .collect()
 }
+
+pub fn parse_timedelta(str: &str) -> anyhow::Result<chrono::TimeDelta> {
+    let mut accum_number = 0i64;
+    let mut cur_number = 0i64;
+    for char in str.chars() {
+        if let Some(digit) = char.to_digit(10) {
+            cur_number = cur_number * 10 + digit as i64;
+        } else {
+            let multiplier = match char {
+                'd' => 24 * 3600,
+                'h' => 3600,
+                'm' => 60,
+                's' => 1,
+                ' ' => 0,
+                _ => return Err(anyhow::anyhow!("Invalid character in time delta: {}", char)),
+            };
+            if multiplier > 0 {
+                accum_number += cur_number * multiplier;
+                cur_number = 0;
+            }
+        }
+    }
+    if cur_number != 0 {
+        // If the last number was without a unit, consider it minutes
+        accum_number += cur_number * 60;
+    }
+    chrono::TimeDelta::new(accum_number, 0).ok_or(anyhow::anyhow!("Failed to parse time"))
+}
+
+pub fn format_timedelta(timedelta: &chrono::TimeDelta) -> String {
+    format!("{}s", timedelta.num_seconds())
+}

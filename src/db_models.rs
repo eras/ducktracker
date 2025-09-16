@@ -4,7 +4,7 @@ use std::collections::VecDeque;
 
 use crate::models::{self, SessionId, TagsAux};
 use crate::state;
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, TimeDelta, Utc};
 use serde::{Deserialize, Serialize};
 
 /// Represents a session as stored in the database.
@@ -16,6 +16,7 @@ pub struct DbSession {
     pub fetch_id: models::FetchId,
     pub tags: TagsAux,
     pub max_points: usize,
+    pub max_point_age: Option<TimeDelta>,
 }
 
 impl From<&state::Session> for DbSession {
@@ -27,6 +28,7 @@ impl From<&state::Session> for DbSession {
             fetch_id: session.fetch_id().clone(),
             tags: session.tags().clone(),
             max_points: session.max_points(),
+            max_point_age: session.max_point_age(),
         }
     }
 }
@@ -42,6 +44,7 @@ impl From<DbSession> for state::Session {
             .with_fetch_id(db_session.fetch_id)
             .with_tags(db_session.tags)
             .with_max_points(db_session.max_points)
+            .with_max_point_age(db_session.max_point_age)
             .build()
     }
 }
