@@ -35,7 +35,9 @@ pub struct Session {
 pub struct State {
     sessions: HashMap<models::SessionId, Session>,
     session_added: Arc<Notify>,
-    expirations: BinaryHeap<Reverse<(DateTime<Utc>, models::SessionId)>>,
+
+    // A fast way to find the oldest expiring session
+    session_expirations: BinaryHeap<Reverse<(DateTime<Utc>, models::SessionId)>>,
 
     pub updates: Updates,
     public_tags: HashMap<models::Tag, usize>, // reference count
@@ -88,7 +90,7 @@ impl State {
             updates,
             sessions: HashMap::new(),
             session_added: Arc::new(Notify::new()),
-            expirations: BinaryHeap::new(),
+            session_expirations: BinaryHeap::new(),
             next_fetch_id: models::FetchId::default(),
             public_tags: HashMap::new(),
             users,
@@ -142,7 +144,7 @@ impl State {
                     highest_fetch_id = session.fetch_id.0;
                 }
 
-                self.expirations
+                self.session_expirations
                     .push(Reverse((session.expires_at, session.session_id.clone())));
                 self.sessions.insert(session.session_id.clone(), session);
                 self.session_added.notify_waiters();
@@ -218,7 +220,7 @@ impl State {
             tags: tags_aux.clone(),
             max_points: options.max_points.unwrap_or(self.max_points),
         };
-        self.expirations.push(Reverse((
+        self.session_expirations.push(Reverse((
             new_session.expires_at,
             new_session.session_id.clone(),
         )));
@@ -250,7 +252,7 @@ impl State {
 
                 state.remove_expired_sessions().await;
 
-                if let Some(Reverse((expires_at, _))) = state.expirations.peek() {
+                if let Some(Reverse((expires_at, _))) = state.session_expirations.peek() {
                     let now = Utc::now();
 
                     next_sleep_duration = expires_at
@@ -282,10 +284,10 @@ impl State {
     async fn remove_expired_sessions(&mut self) {
         let now = Utc::now();
         loop {
-            if let Some(Reverse((expires_at, session_id))) = self.expirations.peek() {
+            if let Some(Reverse((expires_at, session_id))) = self.session_expirations.peek() {
                 if expires_at <= &now {
                     let session_id = session_id.clone();
-                    self.expirations.pop();
+                    self.session_expirations.pop();
                     if self.sessions.contains_key(&session_id) {
                         log::debug!("Removing expired session {session_id}");
                         self.remove_session(&session_id).await;
