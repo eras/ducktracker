@@ -33,15 +33,16 @@ random private id is generated for the user.
 
 # Tag formats
 
-| Tag/Syntax        | Description                                                                                          |
-|-------------------|------------------------------------------------------------------------------------------------------|
-| `private:tagname` | Private tag, only sent to clients that know it already                                               |
-| `priv:tagname`    | (Same as above)                                                                                      |
-| `tagname`         | (Same as above)                                                                                      |
-| `public:tagname`  | Public tag, pushed to clients that ask for all tags                                                  |
-| `pub:tagname`     | (Same as above)                                                                                      |
-| `points:42`       | Not a tag; set the maximum number of points to store for this share session                          |
-| `expire:1h1m1s`   | Not a tag; expire data in this sharing session after 1 hour, 1 minute and 1 second, ie. 3061 seconds |
+| Tag/Syntax        | Description                                                                                                                        |
+|-------------------|------------------------------------------------------------------------------------------------------------------------------------|
+| `private:tagname` | Private tag, only sent to clients that know it already                                                                             |
+| `priv:tagname`    | (Same as above)                                                                                                                    |
+| `tagname`         | (Same as above)                                                                                                                    |
+| `public:tagname`  | Public tag, pushed to clients that ask for all tags                                                                                |
+| `pub:tagname`     | (Same as above)                                                                                                                    |
+| `points:42`       | Not a tag; set the maximum number of points to store for this share session                                                        |
+| `expire:1h1m1s`   | Not a tag; expire data in this sharing session after 1 hour, 1 minute and 1 second, ie. 3061 seconds                               |
+| `persist`         | Not a tag; keep the data around until it expires or the original sharing period ends, even if the client stops the sharing session |
 
 # Compilation
 

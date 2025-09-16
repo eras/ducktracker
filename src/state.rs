@@ -43,6 +43,14 @@ pub struct Session {
     // is the oldest data of this Session added to the data expiration structure?
     #[builder(default)]
     added_to_expiration: bool,
+
+    // should we reject new data? Used to provide persist and also deal with https://github.com/bilde2910/Hauk/issues/230
+    #[builder(required)]
+    reject_data: bool,
+
+    // should the data of this session survive even after stopping it, and let expiration deal with it?
+    #[builder(required)]
+    persist: bool,
 }
 
 impl Session {
@@ -72,6 +80,14 @@ impl Session {
 
     pub fn max_point_age(&self) -> Option<chrono::TimeDelta> {
         self.max_point_age
+    }
+
+    pub fn reject_data(&self) -> bool {
+        self.reject_data
+    }
+
+    pub fn persist(&self) -> bool {
+        self.persist
     }
 }
 
@@ -273,6 +289,8 @@ impl State {
             max_points: options.max_points.unwrap_or(self.max_points),
             max_point_age: options.max_point_age,
             added_to_expiration: false,
+            reject_data: false,
+            persist: options.persist,
         };
         log::debug!(
             "Creating new session {} with options {:?} expires at {}",
@@ -436,7 +454,18 @@ impl State {
         Ok(())
     }
 
-    pub async fn remove_session(&mut self, session_id: &models::SessionId) {
+    pub async fn request_remove_session(&mut self, session_id: &models::SessionId) {
+        if let Some(session) = self.sessions.get_mut(session_id) {
+            log::debug!("Requested to remove a session: persist={}", session.persist);
+            if session.persist {
+                session.reject_data = true;
+            } else {
+                self.remove_session(session_id).await;
+            }
+        }
+    }
+
+    async fn remove_session(&mut self, session_id: &models::SessionId) {
         // we let the entry in self.expirations remain, it dose no harm as we never*
         // give out duplicate session ids
         if let Some(session) = self.sessions.remove(session_id) {
@@ -546,6 +575,10 @@ impl State {
             Some(s) => s,
             None => return Err(Error::NoSuchSession),
         };
+
+        if session.reject_data {
+            return Err(Error::NoSuchSession);
+        }
 
         let now = Utc::now();
         if session.expires_at < now {

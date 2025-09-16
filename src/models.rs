@@ -329,6 +329,7 @@ impl Tags {
 pub struct Options {
     pub max_points: Option<usize>,
     pub max_point_age: Option<chrono::TimeDelta>,
+    pub persist: bool,
 }
 
 impl TagsAux {
@@ -390,8 +391,15 @@ impl TagsAux {
                             }
                         }
                     } else {
-                        // If no keyword specified, default to private tag
-                        tags.insert(TagAux::new(field, TagVisibility::Private)?);
+                        match field {
+                            "persist" => {
+                                options.persist = true;
+                            }
+                            _ => {
+                                // If no keyword specified, default to private tag
+                                tags.insert(TagAux::new(field, TagVisibility::Private)?);
+                            }
+                        }
                     }
                 }
                 Ok((TagsAux(tags), options))

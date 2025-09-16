@@ -130,7 +130,7 @@ pub async fn stop_session(
     state: web::Data<AppState>,
 ) -> impl Responder {
     let mut state = state.lock().await;
-    state.remove_session(&data.session_id).await;
+    state.request_remove_session(&data.session_id).await;
     let response = models::StopResponse {};
     HttpResponse::Ok()
         .content_type("text/plain")

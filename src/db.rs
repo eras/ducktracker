@@ -54,7 +54,9 @@ impl DbClient {
                     fetch_id INTEGER NOT NULL,
                     tags TEXT NOT NULL,
                     max_points INTEGER NOT NULL,
-                    max_point_age TEXT
+                    max_point_age TEXT,
+                    reject_data BOOL NOT NULL,
+                    persist BOOL NOT NULL
                 )",
                 (),
             )
@@ -69,7 +71,7 @@ impl DbClient {
             .lock()
             .await
             .execute(
-                "INSERT INTO sessions (session_id, expires_at, fetch_id, tags, max_points, max_point_age) VALUES (?, ?, ?, ?, ?, ?)",
+                "INSERT INTO sessions (session_id, expires_at, fetch_id, tags, max_points, max_point_age, reject_data, persist) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     session.session_id.0.clone(),
                     session.expires_at.to_rfc3339(), // Store DateTime as ISO 8601 string
@@ -77,6 +79,8 @@ impl DbClient {
                     tags_json,
 		    session.max_points as u64,
 		    session.max_point_age.map(|timedelta: chrono::TimeDelta| utils::format_timedelta(&timedelta)),
+		    session.reject_data,
+		    session.persist,
                 ),
             )
             .await
@@ -96,7 +100,7 @@ impl DbClient {
             .lock()
             .await
             .query(
-                "SELECT session_id, expires_at, fetch_id, tags, max_points, max_point_age FROM sessions",
+                "SELECT session_id, expires_at, fetch_id, tags, max_points, max_point_age, reject_data, persist FROM sessions",
                 (),
             )
             .await
@@ -116,6 +120,9 @@ impl DbClient {
         let tags_val = row.get::<String>(3)?;
         let max_points_val = row.get::<u64>(4)?;
         let max_point_age_val = row.get::<Option<String>>(5)?;
+        let reject_data_val = row.get::<bool>(6)?;
+        let persist_val = row.get::<bool>(6)?;
+
         let session_id = SessionId(session_id_val);
         let expires_at = DateTime::parse_from_rfc3339(&expires_at_val)?.with_timezone(&Utc);
         let fetch_id = FetchId(u32::try_from(fetch_id_val)?);
@@ -124,6 +131,8 @@ impl DbClient {
         let max_point_age = max_point_age_val
             .map(|x| utils::parse_timedelta(&x))
             .transpose()?;
+        let reject_data = reject_data_val;
+        let persist = persist_val;
 
         Ok(DbSession {
             session_id,
@@ -132,6 +141,8 @@ impl DbClient {
             tags,
             max_points,
             max_point_age,
+            reject_data,
+            persist,
         })
     }
 

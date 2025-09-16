@@ -17,6 +17,8 @@ pub struct DbSession {
     pub tags: TagsAux,
     pub max_points: usize,
     pub max_point_age: Option<TimeDelta>,
+    pub reject_data: bool,
+    pub persist: bool,
 }
 
 impl From<&state::Session> for DbSession {
@@ -29,6 +31,8 @@ impl From<&state::Session> for DbSession {
             tags: session.tags().clone(),
             max_points: session.max_points(),
             max_point_age: session.max_point_age(),
+            reject_data: session.reject_data(),
+            persist: session.persist(),
         }
     }
 }
@@ -45,6 +49,8 @@ impl From<DbSession> for state::Session {
             .with_tags(db_session.tags)
             .with_max_points(db_session.max_points)
             .with_max_point_age(db_session.max_point_age)
+            .with_reject_data(db_session.reject_data)
+            .with_persist(db_session.persist)
             .build()
     }
 }
