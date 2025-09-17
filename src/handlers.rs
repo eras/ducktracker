@@ -149,6 +149,9 @@ pub async fn post_location(
     match state.add_location(&data).await {
         Err(state::Error::NoSuchSession) => HttpResponse::NotFound().body("Session not found."),
         Err(state::Error::SessionExpired) => HttpResponse::Gone().body("Session has expired."),
+        Err(state::Error::IOError) => {
+            HttpResponse::Gone().body("Failed to write logged session to log.")
+        }
         Ok(()) => {
             let response = PostResponse {
                 public_url: "http://localhost".to_string(), // TODO

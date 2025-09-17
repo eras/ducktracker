@@ -43,7 +43,7 @@ random private id is generated for the user.
 | `points:42`       | Not a tag; set the maximum number of points to store for this share session                                                        |
 | `expire:1h1m1s`   | Not a tag; expire data in this sharing session after 1 hour, 1 minute and 1 second, ie. 3061 seconds                               |
 | `nostop`          | Not a tag; keep the data around until it expires or the original sharing period ends, even if the client stops the sharing session |
-|                   |                                                                                                                                    |
+| `log`             | Not a tag; if the server is has location logging enabled, opt this session for data logging with `--log-tags-file`                 |
 
 # Compilation
 

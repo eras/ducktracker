@@ -8,7 +8,8 @@ use anyhow::{Context as AnyhowContext, Result as AnyhowResult};
 use chrono::{DateTime, Utc};
 use std::cmp::Reverse;
 use std::collections::{BinaryHeap, VecDeque};
-use std::path::Path;
+use std::io::Write;
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 use std::{collections::HashMap, pin::Pin, sync::Arc};
 use tokio::sync::{Mutex, Notify, broadcast};
@@ -20,6 +21,7 @@ const MAX_TOKENS: usize = 100000;
 pub enum Error {
     NoSuchSession,
     SessionExpired,
+    IOError,
 }
 
 /// Represents a single tracking session. This data is stored in memory.
@@ -51,6 +53,10 @@ pub struct Session {
     // should the data of this session survive even after stopping it, and let expiration deal with it?
     #[builder(required)]
     no_stop: bool,
+
+    // Is this session logged?
+    #[builder(required)]
+    log: bool,
 }
 
 impl Session {
@@ -88,6 +94,10 @@ impl Session {
 
     pub fn no_stop(&self) -> bool {
         self.no_stop
+    }
+
+    pub fn log(&self) -> bool {
+        self.log
     }
 }
 
@@ -133,6 +143,9 @@ pub struct State {
     pub box_coords: Option<BoxCoords>,
 
     no_web_auth: bool,
+
+    // log_tags: models::Tags,
+    log_tags_file: Option<std::fs::File>,
 }
 
 impl State {
@@ -152,6 +165,7 @@ impl State {
         prometheus_user: Option<String>,
         prometheus_password: Option<String>,
         no_web_auth: bool,
+        log_tags_file: &Option<PathBuf>,
     ) -> AnyhowResult<Arc<Mutex<Self>>> {
         let users = utils::read_colon_separated_file(password_file)
             .with_context(|| format!("Failed to open a {password_file:?}"))?;
@@ -159,6 +173,17 @@ impl State {
         let db_client = Arc::new(DbClient::new(database_file).await?); // Initialize DB client
 
         let default_tag = models::Tag(default_tag.to_string());
+
+        let log_tags_file = if let Some(log_tags_file) = log_tags_file {
+            Some(
+                std::fs::File::options()
+                    .append(true)
+                    .create(true)
+                    .open(log_tags_file)?,
+            )
+        } else {
+            None
+        };
 
         let mut state = Self {
             updates,
@@ -183,6 +208,8 @@ impl State {
             prometheus_user,
             prometheus_password,
             no_web_auth,
+            // log_tags,
+            log_tags_file,
         };
 
         state.add_public_tag(default_tag);
@@ -295,6 +322,8 @@ impl State {
             std::cmp::max(1usize, options.max_points.unwrap_or(self.default_points)),
         );
 
+        let log = options.log;
+
         // Create a new session and store it in the DashMap.
         let new_session = Session {
             session_id: session_id.clone(),
@@ -307,6 +336,7 @@ impl State {
             added_to_expiration: false,
             reject_data: false,
             no_stop: options.no_stop,
+            log,
         };
         log::debug!(
             "Creating new session {} with options {:?} expires at {}",
@@ -666,6 +696,35 @@ impl State {
             meta,
             changes: [UpdateChange::Add { points }].to_vec(),
         };
+
+        if let Some(log_tags_file) = &mut self.log_tags_file {
+            let public_session_tags = session.tags.public_tags();
+            let public_tags: Vec<_> = public_session_tags.0.iter().map(|x| x.0.clone()).collect();
+            if !public_tags.is_empty() {
+                let entry = models::LogEntry {
+                    time: data.time,
+                    provider: data.provider,
+                    speed: data.speed,
+                    accuracy: data.accuracy,
+                    latitude,
+                    longitude,
+                    fetch_id: session.fetch_id.0,
+                    public_tags,
+                };
+                writeln!(
+                    log_tags_file,
+                    "{}",
+                    serde_json::to_string(&entry).map_err(|error| {
+                        log::error!("IO error while serializing entry to to tags log: {error}");
+                        Error::IOError
+                    })?
+                )
+                .map_err(|error| {
+                    log::error!("IO error while writing to tags log: {error}");
+                    Error::IOError
+                })?;
+            }
+        }
 
         self.updates.send_update(context, update);
 

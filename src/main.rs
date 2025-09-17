@@ -98,6 +98,10 @@ struct Config {
     /// If set, we don't require authentication on the web part (any user/pass will work in the API)
     #[arg(long)]
     no_web_auth: bool,
+
+    /// The file to use for logging tags
+    #[arg(long)]
+    log_tags_file: Option<PathBuf>,
 }
 
 async fn real_main() -> anyhow::Result<()> {
@@ -155,6 +159,7 @@ async fn real_main() -> anyhow::Result<()> {
         config.prometheus_user,
         config.prometheus_password,
         config.no_web_auth,
+        &config.log_tags_file,
     )
     .await?;
 

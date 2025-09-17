@@ -330,6 +330,7 @@ pub struct Options {
     pub max_points: Option<usize>,
     pub max_point_age: Option<chrono::TimeDelta>,
     pub no_stop: bool,
+    pub log: bool,
 }
 
 impl TagsAux {
@@ -394,6 +395,9 @@ impl TagsAux {
                         match field {
                             "nostop" => {
                                 options.no_stop = true;
+                            }
+                            "log" => {
+                                options.log = true;
                             }
                             _ => {
                                 // If no keyword specified, default to private tag
@@ -608,4 +612,16 @@ pub struct StreamRequest {
     #[serde(default = "crate::utils::CommaSeparatedVec::new")]
     pub tags: crate::utils::CommaSeparatedVec<Tag>,
     pub token: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct LogEntry {
+    pub provider: Option<u64>,
+    pub time: f64,
+    pub latitude: f64,
+    pub longitude: f64,
+    pub accuracy: Option<f64>,
+    pub speed: Option<f64>,
+    pub fetch_id: u32,
+    pub public_tags: Vec<String>,
 }
