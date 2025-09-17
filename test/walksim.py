@@ -256,6 +256,12 @@ def main() -> None:
         help="Approximate distance to move per interval in meters (default: 10.0).",
     )
     parser.add_argument(
+        "--random-offset",
+        type=float,
+        default=10000.0,  # 10 meters
+        help="Approximate distance to randomize initial spot from the initial location (default: 10000.0).",
+    )
+    parser.add_argument(
         "--preload",
         type=float,
         default=0,
@@ -314,6 +320,7 @@ def main() -> None:
     private_tags: list[str] = args.private_tags.split(",")
     custom_tags: list[str] = args.custom_tags.split(",")
     verbose: bool = args.verbose
+    random_offset: float = args.random_offset
 
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
@@ -336,7 +343,9 @@ def main() -> None:
         session_id = temp_session_id  # Store the created session_id
 
         # 3. Simulate movement and send location updates
-        current_lat, current_lon = INITIAL_LAT, INITIAL_LON
+        current_lat, current_lon = INITIAL_LAT + meters_to_degrees(
+            (2 * random.random() - 1) * random_offset
+        ), INITIAL_LON + meters_to_degrees((2 * random.random() - 1) * random_offset)
         start_time = time.monotonic()  # Use monotonic for reliable duration measurement
         end_time = start_time + share_duration
 
