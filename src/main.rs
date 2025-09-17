@@ -75,6 +75,10 @@ struct Config {
     #[arg(long, default_value = "200")]
     default_points: usize,
 
+    /// Default data expiration time (can be overridden with expire:10s)
+    #[arg(long)]
+    default_expire_duration: Option<humantime::Duration>,
+
     /// Heart beat interval; changes will be reported to clients latest by this delay, and empty heartbeat messages are sent with this interval
     #[arg(long, default_value = "1000ms")]
     update_interval: humantime::Duration,
@@ -123,6 +127,14 @@ async fn real_main() -> anyhow::Result<()> {
     let start_time = std::time::Instant::now();
     let sse_counter = Arc::new(AtomicU64::new(0));
 
+    let default_max_point_age = config
+        .default_expire_duration
+        .map(|x| {
+            let x: std::time::Duration = x.into();
+            chrono::TimeDelta::from_std(x)
+        })
+        .transpose()?;
+
     let updates = state::Updates::new(config.update_interval.into()).await;
     let app_state: AppState = State::new(
         updates,
@@ -133,6 +145,7 @@ async fn real_main() -> anyhow::Result<()> {
         config.server_name.as_deref(),
         config.max_points,
         config.default_points,
+        default_max_point_age,
         config.update_interval.into(),
         parsed_box_coords, // PASS THE PARSED BOX COORDINATES
         config.prometheus_user,

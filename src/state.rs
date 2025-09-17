@@ -126,6 +126,8 @@ pub struct State {
 
     default_points: usize,
 
+    default_max_point_age: Option<chrono::TimeDelta>,
+
     pub update_interval: Duration,
 
     pub box_coords: Option<BoxCoords>,
@@ -142,6 +144,7 @@ impl State {
         server_name: Option<&str>,
         max_points: usize,
         default_points: usize,
+        default_max_point_age: Option<chrono::TimeDelta>,
         update_interval: Duration,
         box_coords: Option<BoxCoords>,
         prometheus_user: Option<String>,
@@ -171,6 +174,7 @@ impl State {
             server_name: server_name.map(|x| x.to_string()),
             max_points,
             default_points,
+            default_max_point_age,
             update_interval,
             box_coords,
             prometheus_user,
@@ -296,7 +300,7 @@ impl State {
             fetch_id,
             tags: tags_aux.clone(),
             max_points,
-            max_point_age: options.max_point_age,
+            max_point_age: options.max_point_age.or(self.default_max_point_age),
             added_to_expiration: false,
             reject_data: false,
             no_stop: options.no_stop,
