@@ -94,9 +94,7 @@ const HamburgerMenu: React.FC = () => {
             onClick={handleToggleLocation}
             className="block w-full px-4 py-2 text-center text-sm text-white hover:bg-blue-700 hover:text-white"
           >
-            {showClientLocation
-              ? "Disable Location Tracking"
-              : "Enable Location Tracking"}
+            {showClientLocation ? "Don't show my location" : "Show my location"}
           </button>
 
           {/* Trace Display Toggle */}
