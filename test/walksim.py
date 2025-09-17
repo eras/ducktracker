@@ -315,8 +315,8 @@ def main() -> None:
     custom_tags: list[str] = args.custom_tags.split(",")
     verbose: bool = args.verbose
 
-    # Register the SIGINT handler
     signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
 
     session_id: Optional[str] = None  # Initialize session_id to None
 
