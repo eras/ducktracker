@@ -487,6 +487,7 @@ impl State {
         // we let the entry in self.expirations remain, it dose no harm as we never*
         // give out duplicate session ids
         if let Some(session) = self.sessions.remove(session_id) {
+            log::debug!("Start removing session {session_id}");
             let context = UpdateContext {
                 tags: session.tags.as_tags(),
                 is_heartbeat: false,
@@ -514,6 +515,8 @@ impl State {
                     eprintln!("Failed to delete session from DB: {e:?}");
                 }
             });
+
+            log::debug!("Done removing session {session_id}")
         }
     }
 
