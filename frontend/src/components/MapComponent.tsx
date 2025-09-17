@@ -11,7 +11,7 @@ declare const L: typeof import("leaflet");
 // --- Color Fading Constants ---
 const START_COLOR_RGBA = [0, 0, 255, 1];
 const END_COLOR_RGBA = [128, 128, 128, 0.2];
-const MAX_AGE_FADE_SECONDS = 3600;
+const MAX_AGE_FADE_SECONDS = 600;
 
 // Helper function to interpolate RGBA colors
 const interpolateColor = (
