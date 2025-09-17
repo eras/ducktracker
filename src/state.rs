@@ -244,8 +244,7 @@ impl State {
             || Err(anyhow::anyhow!("No such user: {}", user)),
             |p| {
                 if p.starts_with("$") {
-                    bcrypt::verify(password, &p)
-                        .map_err(|e| anyhow::anyhow!("Failed to use bcrypt verify: {}", e))
+                    Ok(pwhash::unix::verify(password, &p))
                 } else {
                     Ok(p == password)
                 }

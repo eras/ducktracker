@@ -33,5 +33,5 @@ anyhow = { version = "1.0.99", features = ["backtrace"] }
 clap = { version = "4", features = ["derive"] }
 async-stream = "0.3.6"
 humantime = "2.2.0"
-bcrypt = "0.17.1"
 typesafe_builder = "1.6.0"
+pwhash = "1.0.0"

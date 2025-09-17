@@ -61,10 +61,11 @@ hello:world
 hello2:$2b$12$7KCLyegP2KL.9X6LpKiLh.5ybmH5KWFFDCXD2KRANBfUmfqQ5cDv.
 ```
 
-For encrypting passwords use bcrypt. You may use `htpasswd -B
+For encrypting passwords use bcrypt. You may use e.g. `htpasswd -B
 ducktracker.passwd username` to add new users to the file (available
-in Debian's `apache2-utils`). You need to restart the server to reload
-it.
+in Debian's `apache2-utils`), though many Unix password hashes are
+supported (SHA-512, SHA-256, HMAC-SHA1, MD5, BSDi crypt, and DES
+crypt). You need to restart the server to reload it.
 
 ## Hauk
 
