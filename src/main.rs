@@ -94,6 +94,10 @@ struct Config {
     /// Password for Prometheus metrics endpoint
     #[arg(long)]
     prometheus_password: Option<String>,
+
+    /// If set, we don't require authentication on the web part (any user/pass will work in the API)
+    #[arg(long)]
+    no_web_auth: bool,
 }
 
 async fn real_main() -> anyhow::Result<()> {
@@ -150,6 +154,7 @@ async fn real_main() -> anyhow::Result<()> {
         parsed_box_coords, // PASS THE PARSED BOX COORDINATES
         config.prometheus_user,
         config.prometheus_password,
+        config.no_web_auth,
     )
     .await?;
 

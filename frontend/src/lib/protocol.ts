@@ -150,19 +150,18 @@ export const useProtocolStore = create<ProtocolState>((set) => {
       useAuthStore.getState();
 
     // Pre-flight check with fetch for authentication
-    if (!username || !password) {
-      console.warn("Attempted to connect without credentials. Showing login.");
-      showLogin();
-      return; // Return early if no credentials
-    }
-
     let token: string | null = null;
 
-    try {
+    if (!username || !password) {
+      console.warn(
+        "Attempted to connect without credentials. Test if empty credentials work",
+      );
+
       const loginRequest: LoginRequest = {
-        username: username ?? "",
-        password: password ?? "",
+        username: "",
+        password: "",
       };
+
       const response = await fetch(`${API_URL}/login`, {
         method: "POST",
         body: JSON.stringify(loginRequest),
@@ -173,23 +172,53 @@ export const useProtocolStore = create<ProtocolState>((set) => {
       });
 
       if (response.status === 401) {
-        console.error("Authentication failed during pre-flight check.");
-        clearCredentials(); // Old credentials are bad
+        console.warn("Empty creds didn't work, go to login");
         showLogin();
-        return; // Return early, connection cannot be established
+        return; // Return early if no credentials
       }
       if (!response.ok) {
         scheduleReconnect(subscribedTags, addTags);
         return;
       }
+      // What do you know, it worked?
       const result: LoginResponse = await response.json();
       token = result.token;
-      console.log(`ducktracker server version ${result.version}`);
-    } catch (e) {
-      console.error("Pre-flight connection check failed:", e);
-      // Decide if you want to show login on network errors too (e.g., server down, network issues)
-      showLogin();
-      return; // Return early, connection cannot be established
+    }
+
+    if (token === null) {
+      try {
+        const loginRequest: LoginRequest = {
+          username: username ?? "",
+          password: password ?? "",
+        };
+        const response = await fetch(`${API_URL}/login`, {
+          method: "POST",
+          body: JSON.stringify(loginRequest),
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+          },
+        });
+
+        if (response.status === 401) {
+          console.error("Authentication failed during pre-flight check.");
+          clearCredentials(); // Old credentials are bad
+          showLogin();
+          return; // Return early, connection cannot be established
+        }
+        if (!response.ok) {
+          scheduleReconnect(subscribedTags, addTags);
+          return;
+        }
+        const result: LoginResponse = await response.json();
+        token = result.token;
+        console.log(`ducktracker server version ${result.version}`);
+      } catch (e) {
+        console.error("Pre-flight connection check failed:", e);
+        // Decide if you want to show login on network errors too (e.g., server down, network issues)
+        showLogin();
+        return; // Return early, connection cannot be established
+      }
     }
 
     // 2. Connect to EventSource

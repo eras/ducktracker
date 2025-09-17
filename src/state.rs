@@ -131,6 +131,8 @@ pub struct State {
     pub update_interval: Duration,
 
     pub box_coords: Option<BoxCoords>,
+
+    no_web_auth: bool,
 }
 
 impl State {
@@ -149,6 +151,7 @@ impl State {
         box_coords: Option<BoxCoords>,
         prometheus_user: Option<String>,
         prometheus_password: Option<String>,
+        no_web_auth: bool,
     ) -> AnyhowResult<Arc<Mutex<Self>>> {
         let users = utils::read_colon_separated_file(password_file)
             .with_context(|| format!("Failed to open a {password_file:?}"))?;
@@ -179,6 +182,7 @@ impl State {
             box_coords,
             prometheus_user,
             prometheus_password,
+            no_web_auth,
         };
 
         state.add_public_tag(default_tag);
@@ -250,7 +254,7 @@ impl State {
     }
 
     pub fn create_token(&mut self, user: &str, password: &str) -> anyhow::Result<Option<String>> {
-        if self.authenticate(user, password)? {
+        if self.no_web_auth || self.authenticate(user, password)? {
             let token = utils::generate_id();
             self.tokens.insert(token.clone());
             Ok(Some(token))
