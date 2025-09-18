@@ -45,8 +45,9 @@ const TagButton: React.FC<TagButtonProps> = ({
           e.stopPropagation(); // Prevent potential parent container click
           if (isMinimized) {
             onUnminimize(); // Unminimize the filter if it's currently minimized
+          } else {
+            onToggle(tag);
           }
-          onToggle(tag);
         }}
         className={buttonClasses}
       >
