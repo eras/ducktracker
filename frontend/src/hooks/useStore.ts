@@ -258,7 +258,6 @@ export const useAppStore = create<AppState>((set) => ({
 
   toggleShowTraces: () =>
     set((state) => {
-      console.log(`Toggling ${state.showTraces} to ${!state.showTraces}`);
       const newShowTraces = !state.showTraces;
       saveShowTracesToStorage(newShowTraces);
       return {
@@ -268,7 +267,6 @@ export const useAppStore = create<AppState>((set) => ({
 
   toggleShowNames: () =>
     set((state) => {
-      console.log(`Toggling ${state.showNames} to ${!state.showNames}`);
       const newShowNames = !state.showNames;
       saveShowNamesToStorage(newShowNames);
       return {
