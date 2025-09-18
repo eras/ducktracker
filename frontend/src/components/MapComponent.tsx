@@ -33,7 +33,6 @@ const MapComponent: React.FC = () => {
   const polylinesRef = useRef<L.LayerGroup | null>(null);
   const markerInstancesRef = useRef<Map<string, L.CircleMarker>>(new Map());
   const polylineInstancesRef = useRef<Map<string, L.Polyline[]>>(new Map());
-  // Add this declaration for the client's marker
   const clientLocationMarkerRef = useRef<L.CircleMarker | null>(null);
   const {
     fetches,
@@ -94,7 +93,6 @@ const MapComponent: React.FC = () => {
         const mapLinkHtml = `<a href="${googleMapsUrl}" target="_blank" class="map-link">🌐</a>`;
 
         let marker = markerInstancesRef.current.get(fetch_id);
-        // Removed nameOrTagsContent variable, constructing directly now
 
         let tooltipContent = mapLinkHtml; // Always start with the globe link
 
@@ -112,7 +110,6 @@ const MapComponent: React.FC = () => {
         }
 
         if (marker) {
-          // ... (rest of update existing marker logic remains the same) ...
           marker.setLatLng(loc.latlon);
           const tooltip = marker.getTooltip();
           if (tooltip?.getContent() !== tooltipContent) {
@@ -137,7 +134,6 @@ const MapComponent: React.FC = () => {
             });
           }
         } else {
-          // ... (rest of create new marker logic remains the same) ...
           marker = L.circleMarker(loc.latlon, {
             radius: 6,
             fillColor: "#0078A8",
@@ -170,7 +166,6 @@ const MapComponent: React.FC = () => {
     });
 
     // --- Handle Polylines ---
-    // ... (Polyline logic remains as per the previous suggested solution) ...
     if (showTraces) {
       Object.entries(throttledFetches).forEach(([fetch_id, fetch]) => {
         const hasSelectedTag =
@@ -223,7 +218,6 @@ const MapComponent: React.FC = () => {
       const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${clientLocation[0]},${clientLocation[1]}`;
       const mapLinkHtml = `<a href="${googleMapsUrl}" target="_blank" class="map-link">🌐</a>`;
 
-      // Prepend the globe link to the client location text
       const clientTooltipContent = mapLinkHtml;
 
       if (clientLocationMarkerRef.current) {
