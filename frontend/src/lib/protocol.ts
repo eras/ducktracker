@@ -250,7 +250,7 @@ export const useProtocolStore = create<ProtocolState>((set) => {
         });
         addTags(addedTags);
       } catch (e) {
-        console.error("Failed to parse SSE message:", e);
+        console.error("Failed to parse SSE message:", e, event.data);
       }
     };
 
