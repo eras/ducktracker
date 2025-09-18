@@ -3,7 +3,7 @@ import { useAppStore } from "../hooks/useStore";
 import { intersection } from "../lib/set";
 import useThrottle from "../hooks/useThrottle";
 import "leaflet";
-import { useProtocolStore } from "../lib/protocol"; // Import useProtocolStore to get serverTime
+import { useProtocolStore } from "../lib/protocol";
 
 // Use a global L from the script tag
 declare const L: typeof import("leaflet");
@@ -30,9 +30,11 @@ const MapComponent: React.FC = () => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const markersRef = useRef<L.LayerGroup | null>(null);
-  const polylinesRef = useRef<L.LayerGroup | null>(null); // Reference for the trace lines
+  const polylinesRef = useRef<L.LayerGroup | null>(null);
   const markerInstancesRef = useRef<Map<string, L.CircleMarker>>(new Map());
-  const polylineInstancesRef = useRef<Map<string, L.Polyline[]>>(new Map()); // For polylines per fetch
+  const polylineInstancesRef = useRef<Map<string, L.Polyline[]>>(new Map());
+  // Add this declaration for the client's marker
+  const clientLocationMarkerRef = useRef<L.CircleMarker | null>(null);
   const {
     fetches,
     selectedTags,
@@ -41,7 +43,7 @@ const MapComponent: React.FC = () => {
     showTraces,
     showNames,
   } = useAppStore();
-  const { serverTime } = useProtocolStore(); // Get serverTime from protocol store
+  const { serverTime } = useProtocolStore();
   const throttledFetches = useThrottle(fetches, 1000);
 
   // Initialize the map (runs only once)
@@ -78,40 +80,45 @@ const MapComponent: React.FC = () => {
   useEffect(() => {
     if (!markersRef.current || !polylinesRef.current || !mapRef.current) return;
 
-    const markersToKeep = new Set<string>(); // Keep track of markers that correspond to current data
-    const polylinesToKeep = new Set<string>(); // Keep track of polylines that correspond to current data
+    const markersToKeep = new Set<string>();
+    const polylinesToKeep = new Set<string>();
 
-    // --- Handle Markers ---
+    // --- Handle Fetches Markers ---
     Object.entries(throttledFetches).forEach(([fetch_id, fetch]) => {
       const hasSelectedTag = intersection(fetch.tags, selectedTags).size !== 0;
       const isFiltered = selectedTags.size > 0 && !hasSelectedTag;
 
       if (!isFiltered && fetch.locations.length > 0) {
         const loc = fetch.locations[fetch.locations.length - 1]; // Last location
+        const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${loc.latlon[0]},${loc.latlon[1]}`;
+        const mapLinkHtml = `<a href="${googleMapsUrl}" target="_blank" class="map-link">🌐</a>`;
 
         let marker = markerInstancesRef.current.get(fetch_id);
-        let tooltipContent = "";
+        // Removed nameOrTagsContent variable, constructing directly now
+
+        let tooltipContent = mapLinkHtml; // Always start with the globe link
 
         if (fetch.name) {
-          tooltipContent += `<b>${fetch.name}</b>`;
-        }
-        if (!showNames) {
-          if (tooltipContent) {
-            tooltipContent += "<br/>";
+          tooltipContent += ` <b>${fetch.name}</b>`; // Add name if present
+          // Always add tags on a new line if there's a name and tags exist
+          if (fetch.tags.size > 0) {
+            tooltipContent += `<br/>${[...fetch.tags].join(", ")}`;
           }
-          tooltipContent += [...fetch.tags].join(", ");
+        } else {
+          // If no name, just show tags (if they exist)
+          if (fetch.tags.size > 0) {
+            tooltipContent += ` ${[...fetch.tags].join(", ")}`;
+          }
         }
 
         if (marker) {
-          // Update existing marker
+          // ... (rest of update existing marker logic remains the same) ...
           marker.setLatLng(loc.latlon);
-          // Update tooltip content if needed
           const tooltip = marker.getTooltip();
           if (tooltip?.getContent() !== tooltipContent) {
             if (tooltip) {
               tooltip.setContent(tooltipContent);
             } else if (tooltipContent) {
-              // If it had no tooltip, but now needs one
               marker.bindTooltip(tooltipContent, {
                 direction: "bottom",
                 offset: L.point(0, 10),
@@ -120,9 +127,8 @@ const MapComponent: React.FC = () => {
               });
             }
           }
-          // Update permanent state if showNames changed
           if (tooltip && tooltip.options.permanent !== showNames) {
-            marker.unbindTooltip(); // Unbind to reset options
+            marker.unbindTooltip();
             marker.bindTooltip(tooltipContent, {
               direction: "bottom",
               offset: L.point(0, 10),
@@ -131,7 +137,7 @@ const MapComponent: React.FC = () => {
             });
           }
         } else {
-          // Create new marker
+          // ... (rest of create new marker logic remains the same) ...
           marker = L.circleMarker(loc.latlon, {
             radius: 6,
             fillColor: "#0078A8",
@@ -164,10 +170,7 @@ const MapComponent: React.FC = () => {
     });
 
     // --- Handle Polylines ---
-    // For polylines, due to the segment-specific fading, it's often easier
-    // to clear and redraw *per trace* rather than try to reuse individual segments.
-    // However, we can still remove traces that no longer exist.
-
+    // ... (Polyline logic remains as per the previous suggested solution) ...
     if (showTraces) {
       Object.entries(throttledFetches).forEach(([fetch_id, fetch]) => {
         const hasSelectedTag =
@@ -175,7 +178,6 @@ const MapComponent: React.FC = () => {
         const isFiltered = selectedTags.size > 0 && !hasSelectedTag;
 
         if (!isFiltered) {
-          // Clear existing polylines for this specific fetch
           let existingPolylines = polylineInstancesRef.current.get(fetch_id);
           if (existingPolylines) {
             existingPolylines.forEach((p) =>
@@ -184,15 +186,12 @@ const MapComponent: React.FC = () => {
           }
           const newPolylines: L.Polyline[] = [];
 
-          // Render new polyline segments with fading effect
           for (let i = 0; i < fetch.locations.length - 1; i++) {
             const loc1 = fetch.locations[i];
             const loc2 = fetch.locations[i + 1];
 
             const ageSeconds = Math.max(0, serverTime - loc2.time);
-
             let factor = Math.min(1, ageSeconds / MAX_AGE_FADE_SECONDS);
-
             const segmentColor = interpolateColor(
               START_COLOR_RGBA,
               END_COLOR_RGBA,
@@ -212,19 +211,79 @@ const MapComponent: React.FC = () => {
       });
     }
 
-    // Remove polylines for traces that no longer exist or are filtered out
     polylineInstancesRef.current.forEach((polylines, fetch_id) => {
       if (!polylinesToKeep.has(fetch_id) || !showTraces) {
-        // Also remove if showTraces is false
         polylines.forEach((p) => polylinesRef.current?.removeLayer(p));
         polylineInstancesRef.current.delete(fetch_id);
       }
     });
 
-    // ... (client location logic remains largely the same)
-    // Make sure the clientLocationMarkerRef is handled to avoid being cleared by markerInstancesRef
+    // --- Handle Client Location Marker ---
+    if (showClientLocation && clientLocation) {
+      const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${clientLocation[0]},${clientLocation[1]}`;
+      const mapLinkHtml = `<a href="${googleMapsUrl}" target="_blank" class="map-link">🌐</a>`;
+
+      // Prepend the globe link to the client location text
+      const clientTooltipContent = mapLinkHtml;
+
+      if (clientLocationMarkerRef.current) {
+        // Update existing client location marker
+        clientLocationMarkerRef.current.setLatLng(clientLocation);
+        const tooltip = clientLocationMarkerRef.current.getTooltip();
+        if (tooltip?.getContent() !== clientTooltipContent) {
+          if (tooltip) {
+            tooltip.setContent(clientTooltipContent);
+          } else {
+            // This case might happen if tooltip was unbound, rebind it
+            clientLocationMarkerRef.current
+              .bindTooltip(clientTooltipContent, {
+                direction: "bottom",
+                offset: L.point(0, 10),
+                permanent: true,
+                className: "tooltip",
+              })
+              .openTooltip();
+          }
+        }
+      } else {
+        // Create new client location marker
+        const clientMarker = L.circleMarker(clientLocation, {
+          radius: 6,
+          fillColor: "#ff0000", // Distinct color for client location
+          color: "#fff",
+          weight: 1,
+          opacity: 1,
+          fillOpacity: 0.8,
+        });
+        clientMarker.bindTooltip(clientTooltipContent, {
+          direction: "bottom",
+          offset: L.point(0, 10),
+          permanent: true, // Client location tooltip is usually permanent
+          className: "tooltip",
+        });
+        markersRef.current?.addLayer(clientMarker); // Add to the same layer group as other markers
+        clientLocationMarkerRef.current = clientMarker;
+      }
+    } else {
+      // Remove client location marker if it exists and should no longer be shown
+      if (clientLocationMarkerRef.current) {
+        markersRef.current?.removeLayer(clientLocationMarkerRef.current);
+        clientLocationMarkerRef.current = null;
+      }
+    }
+
     // ... (fitBounds logic remains the same)
-    // No need for markersRef.current.clearLayers() and polylinesRef.current.clearLayers() anymore at the start
+    // This is the ideal place for any fitBounds logic that needs to run after all markers/polylines are updated
+    // For example, if you want to fit bounds around all visible markers including client location:
+    // const allVisibleMarkers = Array.from(markerInstancesRef.current.values()).concat(
+    //   clientLocationMarkerRef.current ? [clientLocationMarkerRef.current] : []
+    // );
+    // if (allVisibleMarkers.length > 0) {
+    //   const bounds = L.featureGroup(allVisibleMarkers).getBounds();
+    //   if (bounds.isValid()) {
+    //     mapRef.current.fitBounds(bounds, { padding: [50, 50], maxZoom: 15 });
+    //   }
+    // }
   }, [
     throttledFetches,
     selectedTags,

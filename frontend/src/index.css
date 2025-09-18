@@ -23,3 +23,17 @@ body {
 .tooltip {
   text-align: center;
 }
+
+/* Re-enable pointer events for the link specifically */
+/* This ensures the link element inside the tooltip can be clicked */
+.leaflet-tooltip .map-link {
+  pointer-events: auto;
+}
+
+/* For permanent tooltips, ensure the tooltip container itself also allows pointer events.
+   This is often necessary because if the parent has pointer-events: none,
+   children cannot receive events even if they declare pointer-events: auto.
+   The .leaflet-tooltip-permanent class is added by Leaflet when `permanent: true`. */
+.leaflet-tooltip.leaflet-tooltip-permanent {
+  pointer-events: auto;
+}
