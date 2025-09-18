@@ -95,7 +95,7 @@ const TagFilter: React.FC = () => {
   // Determine which tags to render based on minimization state
   const tagsToRender: string[] = isMinimized
     ? [...selectedTags].sort()
-    : [...tags].sort();
+    : [...new Set([...tags, ...selectedTags])].sort();
 
   const containerBaseClasses: string = `
     p-4 bg-white shadow-lg rounded-xl m-4 absolute bottom-0 left-0 z-10
