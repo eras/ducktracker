@@ -113,50 +113,51 @@ const TagFilter: React.FC = () => {
       onClick={isMinimized ? () => setIsMinimized(false) : undefined}
     >
       {/* Header with title and minimize/maximize button */}
-      <div className="flex justify-between items-center pb-2 border-b border-gray-200">
-        <h3 className="text-lg font-semibold text-gray-700">Tag Filter</h3>
-        <button
-          onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
-            e.stopPropagation(); // Prevent container's onClick from firing
-            setIsMinimized(!isMinimized);
-          }}
-          className="p-1 rounded-full hover:bg-gray-200 transition-colors"
-          aria-label={
-            isMinimized ? "Maximize tag filter" : "Minimize tag filter"
-          }
-        >
-          {isMinimized ? (
-            // Maximize icon (chevron down)
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="h-5 w-5"
-              viewBox="0 0 20 20"
-              fill="currentColor"
-            >
-              <path
-                fillRule="evenodd"
-                d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
-                clipRule="evenodd"
-              />
-            </svg>
-          ) : (
-            // Minimize icon (chevron up)
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="h-5 w-5"
-              viewBox="0 0 20 20"
-              fill="currentColor"
-            >
-              <path
-                fillRule="evenodd"
-                d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z"
-                clipRule="evenodd"
-              />
-            </svg>
-          )}
-        </button>
-      </div>
-
+      {!isMinimized ? (
+        <div className="flex justify-between items-center pb-2 border-b border-gray-200">
+          <h3 className="text-lg font-semibold text-gray-700">Tag Filter</h3>
+          <button
+            onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
+              e.stopPropagation(); // Prevent container's onClick from firing
+              setIsMinimized(!isMinimized);
+            }}
+            className="p-1 rounded-full hover:bg-gray-200 transition-colors"
+            aria-label={
+              isMinimized ? "Maximize tag filter" : "Minimize tag filter"
+            }
+          >
+            {isMinimized ? (
+              // Maximize icon (chevron down)
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-5 w-5"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
+                  clipRule="evenodd"
+                />
+              </svg>
+            ) : (
+              // Minimize icon (chevron up)
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-5 w-5"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z"
+                  clipRule="evenodd"
+                />
+              </svg>
+            )}
+          </button>
+        </div>
+      ) : null}
       {/* Tags Display Area */}
       <div
         className={`flex flex-wrap gap-2 ${!isMinimized ? "max-h-60 overflow-y-auto" : ""}`}
