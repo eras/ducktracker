@@ -127,28 +127,32 @@ const saveShowNamesToStorage = (value: boolean) => {
 };
 
 const parseUrl = (url: string): { pub: Set<string>; priv: Set<string> } => {
-  const regex = /(#|&)?pub:([^&]*)(&(?:#|$))?/g;
-  const regex2 = /(#|&)?priv:([^&]*)(&(?:#|$))?/g;
-
-  let match;
   const pubTags = new Set<string>();
-  while ((match = regex.exec(url)) !== null) {
-    const tag = decodeURIComponent(match[2])
-      .replace(/\s*,\s*/g, ",")
-      .split(",");
-    for (const t of tag) {
-      if (t) pubTags.add(t); // Add check for empty strings
-    }
-  }
-
-  let matchPriv;
   const privTags = new Set<string>();
-  while ((matchPriv = regex2.exec(url)) !== null) {
-    const tag = decodeURIComponent(matchPriv[2])
-      .replace(/\s*,\s*/g, ",")
-      .split(",");
-    for (const t of tag) {
-      if (t) privTags.add(t); // Add check for empty strings
+  let currentTagType: "pub" | "priv" | null = null;
+
+  const fields = url.split(",");
+
+  for (const field of fields) {
+    const trimmedField = field.trim();
+
+    if (trimmedField.startsWith("pub:")) {
+      currentTagType = "pub";
+      const tag = trimmedField.substring(4); // "pub:".length = 4
+      if (tag) pubTags.add(tag);
+    } else if (trimmedField.startsWith("priv:")) {
+      currentTagType = "priv";
+      const tag = trimmedField.substring(5); // "priv:".length = 5
+      if (tag) privTags.add(tag);
+    } else {
+      // If no prefix, add to the currently active tag type
+      if (currentTagType === "pub") {
+        if (trimmedField) pubTags.add(trimmedField);
+      } else if (currentTagType === "priv") {
+        if (trimmedField) privTags.add(trimmedField);
+      }
+      // If currentTagType is null, ignore or handle as an error,
+      // for this problem, assuming valid input starts with pub/priv.
     }
   }
 
