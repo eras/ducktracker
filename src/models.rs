@@ -626,6 +626,7 @@ pub struct LoginRequest {
 pub struct LoginResponse {
     pub token: String,
     pub version: String,
+    pub sse_interval_seconds: f64, // how often one should expect an update from the server in the SSE stream
 }
 
 /// Request body for the /api/stream endpoint.
