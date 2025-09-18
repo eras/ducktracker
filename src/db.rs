@@ -57,7 +57,8 @@ impl DbClient {
                     max_point_age TEXT,
                     reject_data BOOL NOT NULL,
                     no_stop BOOL NOT NULL,
-                    log BOOL NOT NULL
+                    log TEXT, -- JSON
+                    name TEXT
                 )",
                 (),
             )
@@ -72,7 +73,7 @@ impl DbClient {
             .lock()
             .await
             .execute(
-                "INSERT INTO sessions (session_id, expires_at, fetch_id, tags, max_points, max_point_age, reject_data, no_stop, log) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "INSERT INTO sessions (session_id, expires_at, fetch_id, tags, max_points, max_point_age, reject_data, no_stop, log, name) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     session.session_id.0.clone(),
                     session.expires_at.to_rfc3339(), // Store DateTime as ISO 8601 string
@@ -82,7 +83,8 @@ impl DbClient {
 		    session.max_point_age.map(|timedelta: chrono::TimeDelta| utils::format_timedelta(&timedelta)),
 		    session.reject_data,
 		    session.no_stop,
-		    session.log,
+		    session.log.as_ref().map(serde_json::to_string).transpose()?,
+		    session.name.clone(),
                 ),
             )
             .await
@@ -102,7 +104,7 @@ impl DbClient {
             .lock()
             .await
             .query(
-                "SELECT session_id, expires_at, fetch_id, tags, max_points, max_point_age, reject_data, no_stop, log FROM sessions",
+                "SELECT session_id, expires_at, fetch_id, tags, max_points, max_point_age, reject_data, no_stop, log, name FROM sessions",
                 (),
             )
             .await
@@ -123,8 +125,9 @@ impl DbClient {
         let max_points_val = row.get::<u64>(4)?;
         let max_point_age_val = row.get::<Option<String>>(5)?;
         let reject_data_val = row.get::<bool>(6)?;
-        let no_stop_val = row.get::<bool>(6)?;
-        let log_val = row.get::<bool>(7)?;
+        let no_stop_val = row.get::<bool>(7)?;
+        let log_val = row.get::<Option<String>>(8)?;
+        let name_val = row.get::<Option<String>>(9)?;
 
         let session_id = SessionId(session_id_val);
         let expires_at = DateTime::parse_from_rfc3339(&expires_at_val)?.with_timezone(&Utc);
@@ -136,7 +139,8 @@ impl DbClient {
             .transpose()?;
         let reject_data = reject_data_val;
         let no_stop = no_stop_val;
-        let log = log_val;
+        let log = log_val.map(|x| serde_json::from_str(&x)).transpose()?;
+        let name = name_val;
 
         Ok(DbSession {
             session_id,
@@ -148,6 +152,7 @@ impl DbClient {
             reject_data,
             no_stop,
             log,
+            name,
         })
     }
 

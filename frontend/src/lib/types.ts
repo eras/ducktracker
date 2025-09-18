@@ -23,6 +23,7 @@ export let parseLocation = (location: Location): ParsedLocation => {
 export interface Fetch {
   locations: Array<ParsedLocation>;
   tags: Set<Tag>;
+  name: string | null;
   max_points: number;
   max_point_age: number | null;
 }

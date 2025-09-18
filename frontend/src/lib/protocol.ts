@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { Tag } from "../bindings/Tag";
 import { Update } from "../bindings/Update";
 import { UpdateChange } from "../bindings/UpdateChange";
-import { Fetches, parseLocation } from "./types";
+import { Fetch, Fetches, parseLocation } from "./types";
 import { union } from "../lib/set";
 import { useAuthStore } from "../hooks/useAuthStore";
 import { LoginRequest } from "../bindings/LoginRequest";
@@ -50,7 +50,7 @@ let processUpdates = (
           ([fetch_id, fetch_in]) => {
             if (fetch_in) {
               let fetch_index = parseInt(fetch_id);
-              let fetch =
+              let fetch: Fetch =
                 fetch_index in state.fetches
                   ? state.fetches[fetch_index]
                   : {
@@ -59,6 +59,7 @@ let processUpdates = (
                       tags: new Set<string>(),
                       max_points: fetch_in.max_points,
                       max_point_age: fetch_in.max_point_age,
+                      name: fetch_in.name,
                     };
               fetch.tags = union(fetch.tags, fetch_in.tags);
               for (const tag of fetch_in.tags) {

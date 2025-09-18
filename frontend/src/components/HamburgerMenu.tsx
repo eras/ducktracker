@@ -14,6 +14,8 @@ const HamburgerMenu: React.FC = () => {
   );
   const showTraces = useAppStore((state) => state.showTraces);
   const toggleShowTraces = useAppStore((state) => state.toggleShowTraces);
+  const showNames = useAppStore((state) => state.showNames);
+  const toggleShowNames = useAppStore((state) => state.toggleShowNames);
 
   const handleLogout = () => {
     disconnect();
@@ -28,6 +30,11 @@ const HamburgerMenu: React.FC = () => {
 
   const handleToggleShowTraces = () => {
     toggleShowTraces();
+    setIsOpen(false);
+  };
+
+  const handleToggleShowNames = () => {
+    toggleShowNames();
     setIsOpen(false);
   };
 
@@ -103,6 +110,14 @@ const HamburgerMenu: React.FC = () => {
             className="block w-full px-4 py-2 text-center text-sm text-white hover:bg-blue-700 hover:text-white"
           >
             {showTraces ? "Hide track traces" : "Show track traces"}
+          </button>
+
+          {/* Name Display Toggle */}
+          <button
+            onClick={handleToggleShowNames}
+            className="block w-full px-4 py-2 text-center text-sm text-white hover:bg-blue-700 hover:text-white"
+          >
+            {showNames ? "Hide names" : "Show names"}
           </button>
           {/* Add more menu items here if needed */}
         </div>

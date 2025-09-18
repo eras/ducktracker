@@ -19,7 +19,8 @@ pub struct DbSession {
     pub max_point_age: Option<TimeDelta>,
     pub reject_data: bool,
     pub no_stop: bool,
-    pub log: bool,
+    pub log: Option<models::Log>,
+    pub name: Option<String>,
 }
 
 impl From<&state::Session> for DbSession {
@@ -34,7 +35,8 @@ impl From<&state::Session> for DbSession {
             max_point_age: session.max_point_age(),
             reject_data: session.reject_data(),
             no_stop: session.no_stop(),
-            log: session.log(),
+            log: session.log().clone(),
+            name: session.name().clone(),
         }
     }
 }
@@ -53,7 +55,8 @@ impl From<DbSession> for state::Session {
             .with_max_point_age(db_session.max_point_age)
             .with_reject_data(db_session.reject_data)
             .with_no_stop(db_session.no_stop)
-            .with_log(db_session.no_stop)
+            .with_log(db_session.log)
+            .with_name(db_session.name)
             .build()
     }
 }

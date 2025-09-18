@@ -22,12 +22,16 @@ interface AppState {
 
   showTraces: boolean;
   toggleShowTraces: () => void;
+
+  showNames: boolean;
+  toggleShowNames: () => void;
 }
 
 const CUSTOM_TAGS_KEY = "customTags";
 const SELECTED_TAGS_KEY = "selectedTags";
 const SHOW_CLIENT_LOCATION_KEY = "showClientLocation";
 const SHOW_TRACES_KEY = "showTraces";
+const SHOW_NAMES_KEY = "showNames";
 
 // Helper function for localStorage
 const getStoredTags = (): Set<string> => {
@@ -72,6 +76,16 @@ const getStoredShowTraces = (): boolean => {
   }
 };
 
+const getStoredShowNames = (): boolean => {
+  try {
+    const stored = localStorage.getItem(SHOW_NAMES_KEY);
+    return stored ? JSON.parse(stored) : false;
+  } catch (e) {
+    console.error("Failed to load showNames from localStorage", e);
+    return false;
+  }
+};
+
 const saveTagsToStorage = (tags: Set<string>) => {
   try {
     localStorage.setItem(CUSTOM_TAGS_KEY, JSON.stringify([...tags]));
@@ -101,6 +115,14 @@ const saveShowTracesToStorage = (value: boolean) => {
     localStorage.setItem(SHOW_TRACES_KEY, JSON.stringify(value));
   } catch (e) {
     console.error("Failed to save showTraces to localStorage", e);
+  }
+};
+
+const saveShowNamesToStorage = (value: boolean) => {
+  try {
+    localStorage.setItem(SHOW_NAMES_KEY, JSON.stringify(value));
+  } catch (e) {
+    console.error("Failed to save showNames to localStorage", e);
   }
 };
 
@@ -141,6 +163,7 @@ const initialStoredSelectedTags = getSelectedTags();
 const initialStoredCustomTags = getStoredTags();
 const initialStoredShowClientLocation = getStoredShowClientLocation();
 const initialStoredShowTraces = getStoredShowTraces();
+const initialStoredShowNames = getStoredShowNames();
 
 // Combine stored tags with URL tags
 const combinedInitialSelectedTags = union(
@@ -170,6 +193,7 @@ export const useAppStore = create<AppState>((set) => ({
   // --- New client location initial state ---
   showClientLocation: initialStoredShowClientLocation,
   showTraces: initialStoredShowTraces,
+  showNames: initialStoredShowNames,
   clientLocation: null,
 
   toggleTag: (tag: string) =>
@@ -239,6 +263,16 @@ export const useAppStore = create<AppState>((set) => ({
       saveShowTracesToStorage(newShowTraces);
       return {
         showTraces: newShowTraces,
+      };
+    }),
+
+  toggleShowNames: () =>
+    set((state) => {
+      console.log(`Toggling ${state.showNames} to ${!state.showNames}`);
+      const newShowNames = !state.showNames;
+      saveShowNamesToStorage(newShowNames);
+      return {
+        showNames: newShowNames,
       };
     }),
 

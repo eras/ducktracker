@@ -41,6 +41,8 @@ pub struct Session {
     max_points: usize,
     #[builder(required)]
     max_point_age: Option<chrono::TimeDelta>,
+    #[builder(required)]
+    name: Option<String>,
 
     // is the oldest data of this Session added to the data expiration structure?
     #[builder(default)]
@@ -54,9 +56,9 @@ pub struct Session {
     #[builder(required)]
     no_stop: bool,
 
-    // Is this session logged?
+    // Is this session logged and how?
     #[builder(required)]
-    log: bool,
+    log: Option<models::Log>,
 }
 
 impl Session {
@@ -96,8 +98,12 @@ impl Session {
         self.no_stop
     }
 
-    pub fn log(&self) -> bool {
-        self.log
+    pub fn log(&self) -> &Option<models::Log> {
+        &self.log
+    }
+
+    pub fn name(&self) -> &Option<String> {
+        &self.name
     }
 }
 
@@ -322,8 +328,6 @@ impl State {
             std::cmp::max(1usize, options.max_points.unwrap_or(self.default_points)),
         );
 
-        let log = options.log;
-
         // Create a new session and store it in the DashMap.
         let new_session = Session {
             session_id: session_id.clone(),
@@ -336,7 +340,8 @@ impl State {
             added_to_expiration: false,
             reject_data: false,
             no_stop: options.no_stop,
-            log,
+            log: options.log.clone(),
+            name: options.name.clone(),
         };
         log::debug!(
             "Creating new session {} with options {:?} expires at {}",
@@ -358,6 +363,7 @@ impl State {
             tags_aux,
             new_session.max_points,
             new_session.max_point_age,
+            new_session.name.clone(),
         )
         .await;
 
@@ -593,6 +599,7 @@ impl State {
         tags_aux: models::TagsAux,
         max_points: usize,
         max_point_age: Option<chrono::TimeDelta>,
+        name: Option<String>,
     ) {
         let public_tags = tags_aux.public_tags();
         let tags: models::Tags = tags_aux.into();
@@ -609,6 +616,7 @@ impl State {
                 tags,
                 max_points,
                 max_point_age,
+                name,
             },
         );
         let meta = models::UpdateMeta {
@@ -697,7 +705,9 @@ impl State {
             changes: [UpdateChange::Add { points }].to_vec(),
         };
 
-        if let Some(log_tags_file) = &mut self.log_tags_file {
+        if let Some(log_tags_file) = &mut self.log_tags_file
+            && let Some(log) = &session.log
+        {
             let public_session_tags = session.tags.public_tags();
             let public_tags: Vec<_> = public_session_tags.0.iter().map(|x| x.0.clone()).collect();
             if !public_tags.is_empty() {
@@ -710,6 +720,7 @@ impl State {
                     longitude,
                     fetch_id: session.fetch_id.0,
                     public_tags,
+                    name: if log.name { session.name.clone() } else { None },
                 };
                 writeln!(
                     log_tags_file,
@@ -897,6 +908,7 @@ impl Updates {
                             tags: shared_tags,
                             max_points: session.max_points,
                             max_point_age: session.max_point_age.map(|x| x.num_seconds() as f64),
+                            name: session.name.clone(),
                         },
                     ))
                 } else {

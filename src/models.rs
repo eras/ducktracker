@@ -325,12 +325,18 @@ impl Tags {
     }
 }
 
+#[derive(Default, Debug, Serialize, Deserialize, Clone)]
+pub struct Log {
+    pub name: bool,
+}
+
 #[derive(Default, Debug)]
 pub struct Options {
     pub max_points: Option<usize>,
     pub max_point_age: Option<chrono::TimeDelta>,
     pub no_stop: bool,
-    pub log: bool,
+    pub log: Option<Log>,
+    pub name: Option<String>,
 }
 
 impl TagsAux {
@@ -384,6 +390,20 @@ impl TagsAux {
                                 })?;
                                 options.max_point_age = Some(parsed_expire);
                             }
+                            "name" => {
+                                options.name = Some(value.to_string());
+                            }
+                            "log" => match value {
+                                "name" => {
+                                    options.log = Some(Log { name: true });
+                                }
+                                _ => {
+                                    return Err(anyhow::anyhow!(
+                                        "Invalid or unknown value '{}' in share_id for log",
+                                        value
+                                    ));
+                                }
+                            },
                             _ => {
                                 return Err(anyhow::anyhow!(
                                     "Invalid or unknown keyword '{}' in share_id",
@@ -397,7 +417,7 @@ impl TagsAux {
                                 options.no_stop = true;
                             }
                             "log" => {
-                                options.log = true;
+                                options.log = Some(Log::default());
                             }
                             _ => {
                                 // If no keyword specified, default to private tag
@@ -509,6 +529,9 @@ pub struct Fetch {
 
     // Max age of a location aka point in seconds
     pub max_point_age: Option<f64>,
+
+    // Name of the sharer, if provided
+    pub name: Option<String>,
 }
 
 #[derive(Debug, Serialize, Clone, TS)]
@@ -624,4 +647,5 @@ pub struct LogEntry {
     pub speed: Option<f64>,
     pub fetch_id: u32,
     pub public_tags: Vec<String>,
+    pub name: Option<String>,
 }

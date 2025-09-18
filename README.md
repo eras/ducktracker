@@ -33,17 +33,21 @@ random private id is generated for the user.
 
 # Tag formats
 
-| Tag/Syntax        | Description                                                                                                                        |
-|-------------------|------------------------------------------------------------------------------------------------------------------------------------|
-| `private:tagname` | Private tag, only sent to clients that know it already                                                                             |
-| `priv:tagname`    | (Same as above)                                                                                                                    |
-| `tagname`         | (Same as above)                                                                                                                    |
-| `public:tagname`  | Public tag, pushed to clients that ask for all tags                                                                                |
-| `pub:tagname`     | (Same as above)                                                                                                                    |
-| `points:42`       | Not a tag; set the maximum number of points to store for this share session                                                        |
-| `expire:1h1m1s`   | Not a tag; expire data in this sharing session after 1 hour, 1 minute and 1 second, ie. 3061 seconds                               |
-| `nostop`          | Not a tag; keep the data around until it expires or the original sharing period ends, even if the client stops the sharing session |
-| `log`             | Not a tag; if the server is has location logging enabled, opt this session for data logging with `--log-tags-file`                 |
+| Tag/Syntax        | Description                                                                                                                         |
+|-------------------|-------------------------------------------------------------------------------------------------------------------------------------|
+| `private:tagname` | Private tag, only sent to clients that know it already                                                                              |
+| `priv:tagname`    | (Same as above)                                                                                                                     |
+| `tagname`         | (Same as above)                                                                                                                     |
+| `public:tagname`  | Public tag, pushed to clients that ask for all tags                                                                                 |
+| `pub:tagname`     | (Same as                                                                                                                            |
+|-------------------|-------------------------------------------------------------------------------------------------------------------------------------|
+|                   | The following are not tags, but special options that affect how the session behaves                                                 |
+| `points:42`       | Set the maximum number of points to store for this share session                                                                    |
+| `expire:1h1m1s`   | Expire data in this sharing session after 1 hour, 1 minute and 1 second, ie. 3061 seconds                                           |
+| `nostop`          | Keep the data around until it expires or the original sharing period ends, even if the client stops the sharing session             |
+| `name:myname`     | Set a name to the session. If someone sees a point in the map, they see this by hovering it, or by enabling the "Show names" option |
+| `log`             | If the server is has location logging enabled, opt this session for data logging with `--log-tags-file`, except for the `name`      |
+| `log`             | Log also session `name`                                                                                                             |
 
 # Compilation
 

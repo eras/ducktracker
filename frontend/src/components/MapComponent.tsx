@@ -39,6 +39,7 @@ const MapComponent: React.FC = () => {
     showClientLocation,
     clientLocation,
     showTraces,
+    showNames,
   } = useAppStore();
   const { serverTime } = useProtocolStore(); // Get serverTime from protocol store
   const throttledFetches = useThrottle(fetches, 1000);
@@ -123,7 +124,27 @@ const MapComponent: React.FC = () => {
             opacity: 1,
             fillOpacity: 0.8,
           });
-          marker.bindTooltip(`${[...fetch.tags].join(", ")}`);
+
+          let tooltipContent = "";
+
+          if (fetch.name) {
+            tooltipContent += `<b>${fetch.name}</b>`;
+          }
+          if (!showNames) {
+            if (tooltipContent) {
+              tooltipContent += "<br/>";
+            }
+            tooltipContent += [...fetch.tags].join(", ");
+          }
+
+          if (tooltipContent) {
+            marker.bindTooltip(tooltipContent, {
+              direction: "bottom",
+              offset: L.point(0, 10),
+              permanent: showNames,
+              className: "tooltip",
+            });
+          }
           markersRef.current?.addLayer(marker);
         }
       }
@@ -179,6 +200,7 @@ const MapComponent: React.FC = () => {
     clientLocation,
     serverTime,
     showTraces,
+    showNames,
   ]); // Add serverTime to dependencies
 
   return <div ref={mapContainerRef} className="w-full h-full z-0" />;
