@@ -34,6 +34,9 @@ const MapComponent: React.FC = () => {
   const markerInstancesRef = useRef<Map<string, L.CircleMarker>>(new Map());
   const polylineInstancesRef = useRef<Map<string, L.Polyline[]>>(new Map());
   const clientLocationMarkerRef = useRef<L.CircleMarker | null>(null);
+  // Add a ref to track if the initial map bounds have been set
+  const initialBoundsSetRef = useRef(false);
+
   const {
     fetches,
     selectedTags,
@@ -266,18 +269,38 @@ const MapComponent: React.FC = () => {
       }
     }
 
-    // ... (fitBounds logic remains the same)
-    // This is the ideal place for any fitBounds logic that needs to run after all markers/polylines are updated
-    // For example, if you want to fit bounds around all visible markers including client location:
-    // const allVisibleMarkers = Array.from(markerInstancesRef.current.values()).concat(
-    //   clientLocationMarkerRef.current ? [clientLocationMarkerRef.current] : []
-    // );
-    // if (allVisibleMarkers.length > 0) {
-    //   const bounds = L.featureGroup(allVisibleMarkers).getBounds();
-    //   if (bounds.isValid()) {
-    //     mapRef.current.fitBounds(bounds, { padding: [50, 50], maxZoom: 15 });
-    //   }
-    // }
+    // --- Fit bounds on initial data, if not already set ---
+    // This logic runs after all markers, polylines, and client location are updated for the current render cycle.
+    if (!initialBoundsSetRef.current) {
+      const allVisibleFeatures: L.Layer[] = [];
+
+      // Add all currently rendered markers
+      markerInstancesRef.current.forEach((marker) => {
+        allVisibleFeatures.push(marker);
+      });
+
+      // Add all currently rendered polylines (if traces are shown)
+      if (showTraces) {
+        polylineInstancesRef.current.forEach((polylines) => {
+          allVisibleFeatures.push(...polylines);
+        });
+      }
+
+      // Add client location marker if it's currently rendered
+      if (clientLocationMarkerRef.current) {
+        allVisibleFeatures.push(clientLocationMarkerRef.current);
+      }
+
+      // If there are features to show and bounds haven't been set yet
+      if (allVisibleFeatures.length > 0) {
+        const bounds = L.featureGroup(allVisibleFeatures).getBounds();
+        // Ensure bounds are valid (e.g., if all points are the same)
+        if (bounds.isValid()) {
+          mapRef.current.fitBounds(bounds, { padding: [50, 50], maxZoom: 15 });
+          initialBoundsSetRef.current = true; // Mark as initialized
+        }
+      }
+    }
   }, [
     throttledFetches,
     selectedTags,
