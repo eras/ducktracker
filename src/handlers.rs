@@ -176,7 +176,6 @@ pub async fn login(
         Ok(Some(token)) => Ok(web::Json(LoginResponse {
             token,
             version: crate::version::VERSION.to_string(),
-            sse_interval_seconds: state.update_interval.as_secs_f64(),
         })),
         Ok(None) => {
             log::error!("login: Unknown user failed to login: {}", &data.username);

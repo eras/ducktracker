@@ -128,7 +128,6 @@ export const useProtocolStore = create<ProtocolState>((set) => {
   let eventSource: EventSource | null = null;
   let retryCount = 0;
   let reconnectTimeoutId: number | null = null;
-  let sseInterval = 10;
   const MAX_RECONNECT_INTERVAL = 5000;
 
   const connect = async (
@@ -154,7 +153,6 @@ export const useProtocolStore = create<ProtocolState>((set) => {
 
     // Pre-flight check with fetch for authentication
     let token: string | null = null;
-    let version: String | null = null;
 
     if (!username || !password) {
       console.warn(
@@ -187,8 +185,6 @@ export const useProtocolStore = create<ProtocolState>((set) => {
       // What do you know, it worked?
       const result: LoginResponse = await response.json();
       token = result.token;
-      sseInterval = result.sse_interval_seconds;
-      version = result.version;
     }
 
     if (token === null) {
@@ -218,17 +214,13 @@ export const useProtocolStore = create<ProtocolState>((set) => {
         }
         const result: LoginResponse = await response.json();
         token = result.token;
-        sseInterval = result.sse_interval_seconds;
-        version = result.version;
+        console.log(`ducktracker server version ${result.version}`);
       } catch (e) {
         console.error("Pre-flight connection check failed:", e);
         // Decide if you want to show login on network errors too (e.g., server down, network issues)
         showLogin();
         return; // Return early, connection cannot be established
       }
-
-      console.trace();
-      console.log(`ducktracker server version ${version}`);
     }
 
     // 2. Connect to EventSource
@@ -239,32 +231,10 @@ export const useProtocolStore = create<ProtocolState>((set) => {
     const credentials = `token=${encodeURIComponent(token)}`;
     const url = `${API_URL}/stream?${credentials}${tagsQuery ? `&${tagsQuery}` : ""}`; // Combine queries carefully
 
-    let sseTimeoutId: number | null = null; // To store the ID of the update timeout
-
-    const handleSseDisconnection = () => {
-      clearTimeout(sseTimeoutId as number); // Ensure any pending timeout is cleared
-      sseTimeoutId = null;
-      eventSource?.close(); // Close the current faulty connection
-      eventSource = null; // Clear the reference
-      scheduleReconnect(subscribedTags, addTags);
-    };
-
-    const resetUpdateTimeout = () => {
-      clearTimeout(sseTimeoutId as number); // Clear any existing timeout
-      const timeoutDurationMs = (sseInterval * 1.2 + 10) * 1000; // Convert to milliseconds
-      sseTimeoutId = setTimeout(() => {
-        console.warn(
-          `SSE timeout: No updates received for (${timeoutDurationMs / 1000} seconds). Reconnecting...`,
-        );
-        handleSseDisconnection(); // Trigger disconnection and reconnection
-      }, timeoutDurationMs);
-    };
-
     eventSource = new EventSource(url);
 
     eventSource.onopen = () => {
       retryCount = 0;
-      resetUpdateTimeout(); // Start the timeout when the connection is open
     };
 
     eventSource.onmessage = (event: MessageEvent) => {
@@ -280,7 +250,6 @@ export const useProtocolStore = create<ProtocolState>((set) => {
           };
         });
         addTags(addedTags);
-        resetUpdateTimeout(); // Reset the timeout after a successful message
       } catch (e) {
         console.error("Failed to parse SSE message:", e, event.data);
       }
@@ -288,7 +257,9 @@ export const useProtocolStore = create<ProtocolState>((set) => {
 
     eventSource.onerror = (error: Event) => {
       console.error("EventSource failed:", error);
-      handleSseDisconnection(); // Use the common disconnection logic
+      eventSource?.close(); // Close the current faulty connection
+      eventSource = null; // Clear the reference
+      scheduleReconnect(subscribedTags, addTags);
     };
 
     // No explicit return value needed, as EventSource is managed internally
