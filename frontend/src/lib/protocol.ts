@@ -82,6 +82,7 @@ let processUpdates = (
           if (points) {
             let fetch = state.fetches[parseInt(fetch_id)];
             const parsedPoints = points.map(parseLocation);
+            console.log("fetch", fetch);
             fetch.locations = [...fetch.locations, ...parsedPoints];
             if (fetch.locations.length > fetch.max_points) {
               fetch.locations.splice(
