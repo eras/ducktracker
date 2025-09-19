@@ -213,7 +213,7 @@ impl Tag {
         }
 
         for c in trimmed_tag.chars() {
-            if !c.is_alphanumeric() && c != '-' && c != '_' {
+            if !c.is_alphanumeric() && c != '-' && c != '_' && c != '.' {
                 return Err(anyhow::anyhow!(
                     "Tag can only contain unicode alphanumeric characters, dashes, and underscores. Invalid character found: '{}'",
                     c
