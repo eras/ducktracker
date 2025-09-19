@@ -391,6 +391,7 @@ impl TagsAux {
                                 options.max_point_age = Some(parsed_expire);
                             }
                             "name" => {
+                                // Later the name will also be inserted to the list of private tags
                                 options.name = Some(value.to_string());
                             }
                             "log" => match value {
@@ -425,6 +426,10 @@ impl TagsAux {
                             }
                         }
                     }
+                }
+                if let Some(name) = &options.name {
+                    // Namse are also private tags
+                    tags.insert(TagAux::new(name, TagVisibility::Private)?);
                 }
                 Ok((TagsAux(tags), options))
             }
