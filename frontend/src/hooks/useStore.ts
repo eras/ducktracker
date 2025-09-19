@@ -224,7 +224,7 @@ export const useAppStore = create<AppState>((set) => ({
 
   addCustomTag: (tag: string) =>
     set((state) => {
-      const trimmedTag = tag.trim().toLowerCase();
+      const trimmedTag = tag.trim();
       if (!trimmedTag || state.customTags.has(trimmedTag)) {
         return {}; // Do nothing if tag is empty or already exists
       }
