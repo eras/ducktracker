@@ -72,13 +72,23 @@ def generate_random_tags(
     num_private: int = 1,
 ) -> str:
     """Selects a random number of tags from provided lists and formats them."""
-    selected_public = random.sample(
-        [f"public:{x}" for x in public_tags], min(num_public, len(public_tags))
+    selected_public = (
+        random.sample(
+            [f"public:{x}" for x in public_tags], min(num_public, len(public_tags))
+        )
+        if len(public_tags)
+        else []
     )
-    selected_private = random.sample(
-        [f"private:{x}" for x in private_tags], min(num_private, len(private_tags))
+    selected_private = (
+        random.sample(
+            [f"private:{x}" for x in private_tags], min(num_private, len(private_tags))
+        )
+        if len(private_tags)
+        else []
     )
-    all_selected_tags = selected_public + selected_private + custom_tags
+    all_selected_tags = [
+        x for x in selected_public + selected_private + custom_tags if x
+    ]
     random.shuffle(all_selected_tags)  # Mix them up
     return ",".join(all_selected_tags)
 
@@ -250,6 +260,18 @@ def main() -> None:
         help="Interval between location updates in seconds (default: 30).",
     )
     parser.add_argument(
+        "--lat",
+        type=float,
+        default=INITIAL_LAT,
+        help="Set initial latitude",
+    )
+    parser.add_argument(
+        "--lon",
+        type=float,
+        default=INITIAL_LON,
+        help="Set initial longitude",
+    )
+    parser.add_argument(
         "--move-distance",
         type=float,
         default=10.0,  # 10 meters
@@ -316,11 +338,13 @@ def main() -> None:
     username: str = args.username
     password: str = args.password
     preload: int | None = args.preload if args.preload else None
-    public_tags: list[str] = args.public_tags.split(",")
-    private_tags: list[str] = args.private_tags.split(",")
+    public_tags: list[str] = args.public_tags.split(",") if args.public_tags else []
+    private_tags: list[str] = args.private_tags.split(",") if args.private_tags else []
     custom_tags: list[str] = args.custom_tags.split(",")
     verbose: bool = args.verbose
     random_offset: float = args.random_offset
+    initial_lat: float = args.lat
+    initial_lon: float = args.lon
 
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
@@ -343,9 +367,9 @@ def main() -> None:
         session_id = temp_session_id  # Store the created session_id
 
         # 3. Simulate movement and send location updates
-        current_lat, current_lon = INITIAL_LAT + meters_to_degrees(
+        current_lat, current_lon = initial_lat + meters_to_degrees(
             (2 * random.random() - 1) * random_offset
-        ), INITIAL_LON + meters_to_degrees((2 * random.random() - 1) * random_offset)
+        ), initial_lon + meters_to_degrees((2 * random.random() - 1) * random_offset)
         start_time = time.monotonic()  # Use monotonic for reliable duration measurement
         end_time = start_time + share_duration
 
